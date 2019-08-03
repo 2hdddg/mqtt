@@ -15,19 +15,31 @@ type ReaderFake struct {
 }
 
 func (r *ReaderFake) ReadPacket(version uint8) (interface{}, error) {
-	return r.pack, r.err
+	p := r.pack
+	r.pack = nil
+	return p, r.err
 }
 
 type WriterFake struct {
-	ack    *packet.AckConnection
-	acks   int
-	ackErr error
+	ack          *packet.AckConnection
+	acks         int
+	ackErr       error
+	pingResps    int
+	pingRespChan chan bool
 }
 
 func (w *WriterFake) WriteAckConnection(ack *packet.AckConnection) error {
 	w.ack = ack
 	w.acks++
 	return w.ackErr
+}
+
+func (w *WriterFake) WritePingResp(resp *packet.PingResp) error {
+	w.pingResps++
+	if w.pingRespChan != nil {
+		w.pingRespChan <- true
+	}
+	return nil
 }
 
 type ConnFake struct {
