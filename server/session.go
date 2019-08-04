@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/2hdddg/mqtt/packet"
+	"github.com/2hdddg/mqtt/topic"
 )
 
 type Session struct {
@@ -14,6 +15,7 @@ type Session struct {
 	wr            Writer
 	publisher     Publisher
 	connPacket    *packet.Connect
+	id            string
 	alive         bool
 	stopChan      chan bool
 	writeWaiting  bool
@@ -49,6 +51,14 @@ func read(
 	} else {
 		packetChan <- p
 	}
+}
+
+func (s *Session) ClientId() string {
+	return s.id
+}
+
+func (s *Session) Publish(tn *topic.Name, payload []byte) error {
+	return nil
 }
 
 func (s *Session) eval() {

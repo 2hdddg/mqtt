@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-
 	"net"
 	"time"
 
@@ -68,5 +67,6 @@ func Connect(conn net.Conn, r Reader, w Writer, a Authorize) (*Session, error) {
 		rd:         r,
 		wr:         w,
 		connPacket: c,
+		id:         c.ClientIdentifier,
 	}, nil
 }
