@@ -1,4 +1,4 @@
-package controlpacket
+package packet
 
 func (r *Reader) int2() (uint16, error) {
 	msb, err1 := r.ReadByte()

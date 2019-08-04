@@ -1,4 +1,4 @@
-package controlpacket
+package packet
 
 func flagsToBitsU8(flags []bool) uint8 {
 	bit := uint8(1)

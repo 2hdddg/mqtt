@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	packet "github.com/2hdddg/mqtt/controlpacket"
+	"github.com/2hdddg/mqtt/packet"
 )
 
 type Session struct {

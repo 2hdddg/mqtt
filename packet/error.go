@@ -1,4 +1,4 @@
-package controlpacket
+package packet
 
 import "fmt"
 

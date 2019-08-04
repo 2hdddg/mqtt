@@ -1,7 +1,6 @@
-package controlpacket
+package packet
 
 import (
-
 	"unicode"
 )
 

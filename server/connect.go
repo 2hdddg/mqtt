@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	packet "github.com/2hdddg/mqtt/controlpacket"
+	"github.com/2hdddg/mqtt/packet"
 )
 
 func Connect(conn net.Conn, r Reader, w Writer, a Authorize) (*Session, error) {

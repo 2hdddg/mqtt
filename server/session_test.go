@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	packet "github.com/2hdddg/mqtt/controlpacket"
+	"github.com/2hdddg/mqtt/packet"
 )
 
 type PubFake struct{}
