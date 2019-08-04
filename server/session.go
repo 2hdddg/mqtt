@@ -9,17 +9,16 @@ import (
 )
 
 type Session struct {
-	conn       net.Conn
-	rd         Reader
-	wr         Writer
-	connPacket *packet.Connect
-	alive      bool
-	stopChan   chan bool
-
-	pingReq       bool
+	conn          net.Conn
+	rd            Reader
+	wr            Writer
+	connPacket    *packet.Connect
+	alive         bool
+	stopChan      chan bool
 	writeWaiting  bool
 	writeErrChan  chan error
 	writeDoneChan chan bool
+	pingReq       bool
 }
 
 type Reader interface {
@@ -75,16 +74,19 @@ func (s *Session) pump() {
 		case <-s.stopChan:
 			s.stopChan <- true
 			return
-		case p := <-readPackChan:
+		case px := <-readPackChan:
 			// Start reader immediately again
 			go read(s.rd, readPackChan, readErrChan)
-			switch p.(type) {
+
+			switch p := px.(type) {
 			case *packet.Connect:
-				fmt.Println("Got connect")
+				// TODO: Close connection, CONNECT not allowed here.
 			case *packet.Publish:
-				fmt.Println("Got publish")
+				if p.QoS == 0 && !p.Retain {
+				} else {
+					fmt.Println("Not supported")
+				}
 			case *packet.PingReq:
-				fmt.Println("Got ping request")
 				s.pingReq = true
 			case *packet.Disconnect:
 				return
