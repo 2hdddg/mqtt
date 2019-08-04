@@ -72,6 +72,13 @@ func (c *ConnFake) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
+type AuthFake struct {
+}
+
+func (a *AuthFake) CheckConnect(c *packet.Connect) packet.ConnRetCode {
+	return packet.ConnAccepted
+}
+
 func TestConnect(t *testing.T) {
 	testcases := []struct {
 		connectPacket *packet.Connect
@@ -127,10 +134,11 @@ func TestConnect(t *testing.T) {
 			ackErr: c.writeAckErr,
 		}
 		conn := &ConnFake{}
+		au := &AuthFake{}
 
 		r.pack = c.connectPacket
 		r.err = c.readError
-		sess, err := Connect(conn, r, w)
+		sess, err := Connect(conn, r, w, au)
 		if c.shouldFail && (sess != nil || err == nil) {
 			t.Errorf("Should fail")
 		}

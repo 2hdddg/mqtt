@@ -10,6 +10,7 @@ import (
 )
 
 type authorize struct{}
+type publisher struct{}
 
 func (a *authorize) CheckConnect(c *packet.Connect) packet.ConnRetCode {
 	/* Mosquitto uses / and - in identifier
@@ -20,17 +21,23 @@ func (a *authorize) CheckConnect(c *packet.Connect) packet.ConnRetCode {
 	return packet.ConnAccepted
 }
 
+func (_ *publisher) Publish(s *server.Session, p *packet.Publish) error {
+	fmt.Println("About to publish", p, "from", s)
+	return nil
+}
+
 func makeSession(conn net.Conn) {
 	rd := &packet.Reader{bufio.NewReader(conn)}
 	wr := &packet.Writer{conn}
 	au := &authorize{}
+	pu := &publisher{}
 
 	sess, err := server.Connect(conn, rd, wr, au)
 	if err != nil {
 		return
 	}
 
-	sess.Start()
+	sess.Start(pu)
 }
 
 func main() {

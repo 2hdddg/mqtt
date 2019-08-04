@@ -12,6 +12,7 @@ type Session struct {
 	conn          net.Conn
 	rd            Reader
 	wr            Writer
+	publisher     Publisher
 	connPacket    *packet.Connect
 	alive         bool
 	stopChan      chan bool
@@ -32,6 +33,10 @@ type Writer interface {
 
 type Authorize interface {
 	CheckConnect(c *packet.Connect) packet.ConnRetCode
+}
+
+type Publisher interface {
+	Publish(s *Session, p *packet.Publish) error
 }
 
 func read(
@@ -87,6 +92,7 @@ func (s *Session) pump() {
 				// TODO: Close connection, CONNECT not allowed here.
 			case *packet.Publish:
 				if p.QoS == 0 && !p.Retain {
+					s.publisher.Publish(s, p)
 				} else {
 					fmt.Println("Not supported")
 				}
@@ -110,11 +116,12 @@ func (s *Session) pump() {
 	}
 }
 
-func (s *Session) Start() error {
+func (s *Session) Start(p Publisher) error {
 	if s.stopChan != nil {
 		return errors.New("Already started")
 	}
 
+	s.publisher = p
 	s.stopChan = make(chan bool)
 	go s.pump()
 	fmt.Println("Started session")
