@@ -44,7 +44,7 @@ type Publisher interface {
 func read(
 	rd Reader, packetChan chan interface{}, errorChan chan error) {
 
-	// Set read deadline
+	// TODO: Set read deadline
 	p, err := rd.ReadPacket(4)
 	if err != nil {
 		errorChan <- err

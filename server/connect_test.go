@@ -10,14 +10,26 @@ import (
 )
 
 type ReaderFake struct {
-	pack interface{}
-	err  error
+	pack chan interface{}
+	err  chan error
 }
 
 func (r *ReaderFake) ReadPacket(version uint8) (interface{}, error) {
-	p := r.pack
-	r.pack = nil
-	return p, r.err
+	for {
+		select {
+		case p := <-r.pack:
+			return p, nil
+		case e := <-r.err:
+			return nil, e
+		}
+	}
+}
+
+func NewReaderFake() *ReaderFake {
+	return &ReaderFake{
+		pack: make(chan interface{}, 1),
+		err:  make(chan error, 1),
+	}
 }
 
 type WriterFake struct {
@@ -129,15 +141,19 @@ func TestConnect(t *testing.T) {
 	}
 
 	for _, c := range testcases {
-		r := &ReaderFake{}
+		r := NewReaderFake()
 		w := &WriterFake{
 			ackErr: c.writeAckErr,
 		}
 		conn := &ConnFake{}
 		au := &AuthFake{}
 
-		r.pack = c.connectPacket
-		r.err = c.readError
+		if c.connectPacket != nil {
+			r.pack <- c.connectPacket
+		}
+		if c.readError != nil {
+			r.err <- c.readError
+		}
 		sess, err := Connect(conn, r, w, au)
 		if c.shouldFail && (sess != nil || err == nil) {
 			t.Errorf("Should fail")
