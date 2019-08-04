@@ -2,94 +2,11 @@ package server
 
 import (
 	"errors"
-	"net"
+
 	"testing"
-	"time"
 
 	"github.com/2hdddg/mqtt/packet"
 )
-
-type ReaderFake struct {
-	pack chan interface{}
-	err  chan error
-}
-
-func (r *ReaderFake) ReadPacket(version uint8) (interface{}, error) {
-	for {
-		select {
-		case p := <-r.pack:
-			return p, nil
-		case e := <-r.err:
-			return nil, e
-		}
-	}
-}
-
-func NewReaderFake() *ReaderFake {
-	return &ReaderFake{
-		pack: make(chan interface{}, 1),
-		err:  make(chan error, 1),
-	}
-}
-
-type WriterFake struct {
-	ack          *packet.AckConnection
-	acks         int
-	ackErr       error
-	pingResps    int
-	pingRespChan chan bool
-}
-
-func (w *WriterFake) WriteAckConnection(ack *packet.AckConnection) error {
-	w.ack = ack
-	w.acks++
-	return w.ackErr
-}
-
-func (w *WriterFake) WritePingResp(resp *packet.PingResp) error {
-	w.pingResps++
-	if w.pingRespChan != nil {
-		w.pingRespChan <- true
-	}
-	return nil
-}
-
-type ConnFake struct {
-	closed bool
-}
-
-func (c *ConnFake) Read(b []byte) (n int, err error) {
-	return 0, nil
-}
-func (c *ConnFake) Write(b []byte) (n int, err error) {
-	return 0, nil
-}
-func (c *ConnFake) Close() error {
-	c.closed = true
-	return nil
-}
-func (c *ConnFake) LocalAddr() net.Addr {
-	return nil
-}
-func (c *ConnFake) RemoteAddr() net.Addr {
-	return nil
-}
-func (c *ConnFake) SetDeadline(t time.Time) error {
-	return nil
-}
-func (c *ConnFake) SetReadDeadline(t time.Time) error {
-	return nil
-}
-func (c *ConnFake) SetWriteDeadline(t time.Time) error {
-	return nil
-}
-
-type AuthFake struct {
-}
-
-func (a *AuthFake) CheckConnect(c *packet.Connect) packet.ConnRetCode {
-	return packet.ConnAccepted
-}
 
 func TestConnect(t *testing.T) {
 	testcases := []struct {
@@ -141,7 +58,7 @@ func TestConnect(t *testing.T) {
 	}
 
 	for _, c := range testcases {
-		r := NewReaderFake()
+		r := tNewReaderFake(t)
 		w := &WriterFake{
 			ackErr: c.writeAckErr,
 		}
