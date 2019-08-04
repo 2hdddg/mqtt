@@ -30,6 +30,10 @@ type Writer interface {
 	WritePingResp(resp *packet.PingResp) error
 }
 
+type Authorize interface {
+	CheckConnect(c *packet.Connect) packet.ConnRetCode
+}
+
 func read(
 	rd Reader, packetChan chan interface{}, errorChan chan error) {
 

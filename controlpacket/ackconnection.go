@@ -5,10 +5,10 @@ type ConnRetCode uint8
 const (
 	ConnAccepted                     ConnRetCode = 0
 	ConnRefusedVersion               ConnRetCode = 1
-	ConnRefusedIdentifier            ConnRetCode = 1
-	ConnRefusedServerUnavailable     ConnRetCode = 1
-	ConnRefusedBadUsernameOrPassword ConnRetCode = 1
-	ConnRefusedNotAuthorized         ConnRetCode = 1
+	ConnRefusedIdentifier            ConnRetCode = 2
+	ConnRefusedServerUnavailable     ConnRetCode = 3
+	ConnRefusedBadUsernameOrPassword ConnRetCode = 4
+	ConnRefusedNotAuthorized         ConnRetCode = 5
 )
 
 type AckConnection struct {

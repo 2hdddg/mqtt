@@ -5,15 +5,27 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/2hdddg/mqtt/controlpacket"
+	packet "github.com/2hdddg/mqtt/controlpacket"
 	"github.com/2hdddg/mqtt/server"
 )
 
-func makeSession(conn net.Conn) {
-	rd := &controlpacket.Reader{bufio.NewReader(conn)}
-	wr := &controlpacket.Writer{conn}
+type authorize struct{}
 
-	sess, err := server.Connect(conn, rd, wr)
+func (a *authorize) CheckConnect(c *packet.Connect) packet.ConnRetCode {
+	/* Mosquitto uses / and - in identifier
+	if !packet.VerifyClientId(c.ClientIdentifier) {
+		return packet.ConnRefusedIdentifier
+	}
+	*/
+	return packet.ConnAccepted
+}
+
+func makeSession(conn net.Conn) {
+	rd := &packet.Reader{bufio.NewReader(conn)}
+	wr := &packet.Writer{conn}
+	au := &authorize{}
+
+	sess, err := server.Connect(conn, rd, wr, au)
 	if err != nil {
 		return
 	}

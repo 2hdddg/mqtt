@@ -9,7 +9,7 @@ import (
 	packet "github.com/2hdddg/mqtt/controlpacket"
 )
 
-func Connect(conn net.Conn, r Reader, w Writer) (*Session, error) {
+func Connect(conn net.Conn, r Reader, w Writer, a Authorize) (*Session, error) {
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -41,6 +41,14 @@ func Connect(conn net.Conn, r Reader, w Writer) (*Session, error) {
 		return nil, errors.New("Protocol version not supported")
 	}
 
+	// Authorization hook
+	ret := a.CheckConnect(c)
+	if ret != packet.ConnAccepted {
+		w.WriteAckConnection(packet.RefuseConnection(ret))
+		conn.Close()
+		return nil, errors.New("External auth refused")
+	}
+
 	// Accept connection by acking it
 	ack := &packet.AckConnection{
 		SessionPresent: false, // TODO:
@@ -51,8 +59,6 @@ func Connect(conn net.Conn, r Reader, w Writer) (*Session, error) {
 		conn.Close()
 		return nil, errors.New("Failed to send CONNACK")
 	}
-
-	// TODO: Hook
 
 	// Reset deadline after CONNECT received
 	conn.SetReadDeadline(time.Time{})
