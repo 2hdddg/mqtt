@@ -38,25 +38,13 @@ func (r *ReaderFake) tWritePacket(p interface{}) {
 }
 
 type WriterFake struct {
-	ack          *packet.AckConnection
-	acks         int
-	ackErr       error
-	pingResps    int
-	pingRespChan chan bool
+	err     error
+	written chan interface{}
 }
 
-func (w *WriterFake) WriteAckConnection(ack *packet.AckConnection) error {
-	w.ack = ack
-	w.acks++
-	return w.ackErr
-}
-
-func (w *WriterFake) WritePingResp(resp *packet.PingResp) error {
-	w.pingResps++
-	if w.pingRespChan != nil {
-		w.pingRespChan <- true
-	}
-	return nil
+func (w *WriterFake) WritePacket(p interface{}) error {
+	w.written <- p
+	return w.err
 }
 
 type ConnFake struct {
@@ -121,7 +109,7 @@ func tConnect(t *testing.T) (*Session, *ReaderFake, *WriterFake, *PubFake) {
 		ClientIdentifier: "xyz",
 	}
 	w := &WriterFake{
-		pingRespChan: make(chan bool),
+		written: make(chan interface{}, 3),
 	}
 	au := &AuthFake{}
 	conn := &ConnFake{}
@@ -132,6 +120,8 @@ func tConnect(t *testing.T) (*Session, *ReaderFake, *WriterFake, *PubFake) {
 		t.Fatalf("Could not connect to create session")
 	}
 	sess.Start(pub)
+	// Empty connect ack
+	<-w.written
 	return sess, r, w, pub
 }
 

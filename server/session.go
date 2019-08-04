@@ -29,8 +29,7 @@ type Reader interface {
 }
 
 type Writer interface {
-	WriteAckConnection(ack *packet.AckConnection) error
-	WritePingResp(resp *packet.PingResp) error
+	WritePacket(packet interface{}) error
 }
 
 type Authorize interface {
@@ -70,7 +69,7 @@ func (s *Session) eval() {
 		s.writeWaiting = true
 		s.pingReq = false
 		go func() {
-			err := s.wr.WritePingResp(&packet.PingResp{})
+			err := s.wr.WritePacket(&packet.PingResp{})
 			if err != nil {
 				s.writeErrChan <- err
 			} else {

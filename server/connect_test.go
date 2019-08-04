@@ -60,7 +60,8 @@ func TestConnect(t *testing.T) {
 	for _, c := range testcases {
 		r := tNewReaderFake(t)
 		w := &WriterFake{
-			ackErr: c.writeAckErr,
+			err:     c.writeAckErr,
+			written: make(chan interface{}, 3),
 		}
 		conn := &ConnFake{}
 		au := &AuthFake{}
@@ -84,11 +85,12 @@ func TestConnect(t *testing.T) {
 		if !c.shouldClose && conn.closed {
 			t.Errorf("Should NOT have closed")
 		}
-		if c.shouldAck && w.acks != 1 {
-			t.Errorf("Should have acked")
-		}
-		if c.shouldAck && w.ack.RetCode != c.ackRetCode {
-			t.Errorf("Wrong ack")
+		if c.shouldAck {
+			x := <-w.written
+			ack := x.(*packet.AckConnection)
+			if ack.RetCode != c.ackRetCode {
+				t.Errorf("Wrong ack")
+			}
 		}
 	}
 }

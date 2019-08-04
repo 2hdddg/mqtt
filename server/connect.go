@@ -34,7 +34,7 @@ func Connect(conn net.Conn, r Reader, w Writer, a Authorize) (*Session, error) {
 
 	// If version check fails, notify client about wrong version
 	if c.ProtocolVersion < 4 || c.ProtocolVersion > 5 {
-		w.WriteAckConnection(
+		w.WritePacket(
 			packet.RefuseConnection(packet.ConnRefusedVersion))
 		conn.Close()
 		return nil, errors.New("Protocol version not supported")
@@ -43,7 +43,7 @@ func Connect(conn net.Conn, r Reader, w Writer, a Authorize) (*Session, error) {
 	// Authorization hook
 	ret := a.CheckConnect(c)
 	if ret != packet.ConnAccepted {
-		w.WriteAckConnection(packet.RefuseConnection(ret))
+		w.WritePacket(packet.RefuseConnection(ret))
 		conn.Close()
 		return nil, errors.New("External auth refused")
 	}
@@ -53,7 +53,7 @@ func Connect(conn net.Conn, r Reader, w Writer, a Authorize) (*Session, error) {
 		SessionPresent: false, // TODO:
 		RetCode:        packet.ConnAccepted,
 	}
-	err = w.WriteAckConnection(ack)
+	err = w.WritePacket(ack)
 	if err != nil {
 		conn.Close()
 		return nil, errors.New("Failed to send CONNACK")

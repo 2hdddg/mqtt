@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"errors"
 	"io"
 )
 
@@ -12,24 +13,12 @@ type packetize interface {
 	toPacket() []byte
 }
 
-func (w *Writer) write(p packetize) error {
-	packet := p.toPacket()
-	_, err := w.Write(packet)
+func (w *Writer) WritePacket(packet interface{}) error {
+	p, ok := packet.(packetize)
+	if !ok {
+		return errors.New("Wrong type")
+	}
+	b := p.toPacket()
+	_, err := w.Write(b)
 	return err
-}
-
-func (w *Writer) WriteConnect(x *Connect) error {
-	return w.write(x)
-}
-
-func (w *Writer) WriteAckConnection(x *AckConnection) error {
-	return w.write(x)
-}
-
-func (w *Writer) WritePingResp(x *PingResp) error {
-	return w.write(x)
-}
-
-func (w *Writer) WritePublish(x *Publish) error {
-	return w.write(x)
 }
