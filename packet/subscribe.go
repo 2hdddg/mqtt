@@ -14,7 +14,7 @@ type Subscribe struct {
 	Subscriptions []Subscription
 }
 
-func (r *Reader) readSubscribe(fixflags uint8, length uint32) (*Subscribe, error) {
+func (r *Reader) readSubscribe(fixflags uint8) (*Subscribe, error) {
 	const C = "read SUBSCRIBE"
 	sub := &Subscribe{}
 	var err error
@@ -41,7 +41,7 @@ func (r *Reader) readSubscribe(fixflags uint8, length uint32) (*Subscribe, error
 		if err != nil {
 			return nil, &Error{c: C, m: "QoS", err: err}
 		}
-		if qoS >= byte(QoSLast) {
+		if qoS > byte(QoSHighest) {
 			return nil, &Error{c: C, m: "Illegal QoS"}
 		}
 		s.QoS = QoS(qoS)

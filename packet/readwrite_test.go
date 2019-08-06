@@ -34,6 +34,12 @@ func TestWriteReadPacket(t *testing.T) {
 				{Topic: "a/#", QoS: 2},
 			},
 		}},
+		{&SubscribeAck{
+			PacketId: 0x1234,
+			ReturnCodes: []QoS{
+				QoS1, QoS0, QoS2, QoSFailure,
+			},
+		}},
 	}
 
 	for _, c := range testcases {

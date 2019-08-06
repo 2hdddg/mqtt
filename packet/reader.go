@@ -110,7 +110,9 @@ func (r *Reader) ReadPacket(version uint8) (interface{}, error) {
 	case PINGRESP:
 		p, err = r.readPingResp(f)
 	case SUBSCRIBE:
-		p, err = r.readSubscribe(f, rem)
+		p, err = r.readSubscribe(f)
+	case SUBACK:
+		p, err = r.readSubscribeAck(f)
 	default:
 		err = &Error{c: "control packet read",
 			m: "Unhandled packet", err: err}
