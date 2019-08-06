@@ -9,6 +9,11 @@ import (
 	"github.com/2hdddg/mqtt/topic"
 )
 
+type subscription struct {
+	filter topic.Filter
+	qoS    packet.QoS
+}
+
 type Session struct {
 	conn          net.Conn
 	rd            Reader
@@ -18,10 +23,12 @@ type Session struct {
 	id            string
 	alive         bool
 	stopChan      chan bool
+	subs          []subscription
 	writeWaiting  bool
 	writeErrChan  chan error
 	writeDoneChan chan bool
 	pingReq       bool
+	subAcks       []packet.SubscribeAck
 }
 
 type Reader interface {
@@ -60,22 +67,56 @@ func (s *Session) Publish(tn *topic.Name, payload []byte) error {
 	return nil
 }
 
+func (s *Session) subscribe(sub *packet.Subscribe) {
+	retCodes := make([]packet.QoS, len(sub.Subscriptions))
+	for i, x := range sub.Subscriptions {
+		filter := topic.NewFilter(x.Topic)
+		if filter != nil {
+			retCodes[i] = x.QoS
+			s.subs = append(s.subs, subscription{
+				filter: *filter,
+				qoS:    x.QoS,
+			})
+		} else {
+			retCodes[i] = packet.QoSFailure
+		}
+	}
+
+	s.subAcks = append(s.subAcks, packet.SubscribeAck{
+		PacketId:    sub.PacketId,
+		ReturnCodes: retCodes,
+	})
+}
+
 func (s *Session) eval() {
 	if s.writeWaiting {
 		return
 	}
 
-	if s.pingReq {
+	write := func(x interface{}) {
 		s.writeWaiting = true
-		s.pingReq = false
 		go func() {
-			err := s.wr.WritePacket(&packet.PingResp{})
+			err := s.wr.WritePacket(x)
 			if err != nil {
 				s.writeErrChan <- err
 			} else {
 				s.writeDoneChan <- true
 			}
 		}()
+	}
+
+	if s.pingReq {
+		s.writeWaiting = true
+		s.pingReq = false
+		go write(&packet.PingResp{})
+		return
+	}
+
+	if len(s.subAcks) > 0 {
+		s.writeWaiting = true
+		ack := s.subAcks[0]
+		s.subAcks = s.subAcks[1:]
+		go write(&ack)
 		return
 	}
 }
@@ -99,6 +140,9 @@ func (s *Session) pump() {
 			switch p := px.(type) {
 			case *packet.Connect:
 				// TODO: Close connection, CONNECT not allowed here.
+			case *packet.Subscribe:
+				s.subscribe(p)
+				s.eval()
 			case *packet.Publish:
 				if p.QoS == 0 && !p.Retain {
 					s.publisher.Publish(s, p)
