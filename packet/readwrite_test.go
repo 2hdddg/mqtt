@@ -27,6 +27,13 @@ func TestWriteReadPacket(t *testing.T) {
 		{&PingReq{}},
 		{&PingResp{}},
 		{&Disconnect{Reserved: 7}},
+		{&Subscribe{
+			PacketId: 0x0107,
+			Subscriptions: []Subscription{
+				{Topic: "x/y/z", QoS: 2},
+				{Topic: "a/#", QoS: 2},
+			},
+		}},
 	}
 
 	for _, c := range testcases {
@@ -34,12 +41,12 @@ func TestWriteReadPacket(t *testing.T) {
 		wr := Writer{buf}
 		err := wr.WritePacket(c.x1)
 		if err != nil {
-			t.Errorf("Failed to write packet")
+			t.Errorf("Failed to write packet: %s", err)
 		}
 		rd := Reader{bufio.NewReader(buf)}
 		x2, err := rd.ReadPacket(4)
 		if err != nil {
-			t.Errorf("Failed to read packet")
+			t.Errorf("Failed to read packet: %s", err)
 		}
 
 		if !reflect.DeepEqual(c.x1, x2) {

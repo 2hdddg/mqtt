@@ -3,9 +3,10 @@ package packet
 type QoS uint8
 
 const (
-	QoS0 QoS = 0x00
-	QoS1 QoS = 0x01
-	QoS2 QoS = 0x02
+	QoS0    QoS = 0x00
+	QoS1    QoS = 0x01
+	QoS2    QoS = 0x02
+	QoSLast QoS = 0x03
 )
 
 type Connect struct {

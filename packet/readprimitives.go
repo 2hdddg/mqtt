@@ -1,5 +1,10 @@
 package packet
 
+import (
+	"fmt"
+	"io"
+)
+
 func (r *Reader) int2() (uint16, error) {
 	msb, err1 := r.ReadByte()
 	lsb, err2 := r.ReadByte()
@@ -55,11 +60,39 @@ func (r *Reader) str() (string, error) {
 			c: "string", m: "read fail", err: err}
 	}
 	if n != len(chars) {
-		return "", &Error{
-			c: "string", m: "too few bytes"}
+		m := fmt.Sprintf("too few bytes, %d != %d", n, len(chars))
+		return "", &Error{c: "string", m: m}
 	}
 
 	return string(chars), nil
+}
+
+func (r *Reader) strMaybe() (*string, error) {
+	msb, err1 := r.ReadByte()
+	if err1 == io.EOF {
+		return nil, nil
+	}
+	lsb, err2 := r.ReadByte()
+	if err1 != nil || err2 != nil {
+		return nil, &Error{
+			c: "strMaybe", m: "buf too small"}
+	}
+
+	l := (uint16(msb) << 8) | uint16(lsb)
+
+	chars := make([]byte, l)
+	n, err := r.Read(chars)
+	if err != nil {
+		return nil, &Error{
+			c: "string", m: "read fail", err: err}
+	}
+	if n != len(chars) {
+		m := fmt.Sprintf("too few bytes, %d != %d", n, len(chars))
+		return nil, &Error{c: "string", m: m}
+	}
+
+	s := string(chars)
+	return &s, nil
 }
 
 func (r *Reader) bin() ([]byte, error) {
