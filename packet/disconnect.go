@@ -6,7 +6,7 @@ type Disconnect struct {
 
 func (d *Disconnect) toPacket() []byte {
 	return []byte{
-		uint8(DISCONNECT << 4),
+		uint8(DISCONNECT<<4) | d.Reserved&0x0f,
 		0,
 	}
 }

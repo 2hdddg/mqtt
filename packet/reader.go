@@ -107,6 +107,8 @@ func (r *Reader) ReadPacket(version uint8) (interface{}, error) {
 		p, err = r.readPublish(f)
 	case PINGREQ:
 		p, err = r.readPingReq(f)
+	case PINGRESP:
+		p, err = r.readPingResp(f)
 	default:
 		err = &Error{c: "control packet read",
 			m: "Unhandled packet", err: err}
