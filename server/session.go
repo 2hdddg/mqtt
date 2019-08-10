@@ -16,22 +16,16 @@ type publish struct {
 }
 
 type Session struct {
-	conn       net.Conn
-	rd         Reader
-	wr         Writer
-	publisher  Publisher
-	connPacket *packet.Connect
-	id         string
-	stopChan   chan bool
-	subs       *subscriptions
-
-	writeWaiting  bool
-	writeErrChan  chan error
-	writeDoneChan chan bool
-	pingReq       bool
-	subAcks       []packet.SubscribeAck
-	publishChan   chan *publish
-	toPublish     []*publish
+	conn        net.Conn
+	rd          Reader
+	wr          Writer
+	publisher   Publisher
+	connPacket  *packet.Connect
+	id          string
+	stopChan    chan bool
+	subs        *subscriptions
+	wrQueue     *writeQueue
+	publishChan chan *publish
 }
 
 type Reader interface {
@@ -77,58 +71,15 @@ func (s *Session) subscribe(sub *packet.Subscribe) {
 		retCodes[i] = s.subs.subscribe(&sub.Subscriptions[i])
 	}
 
-	s.subAcks = append(s.subAcks, packet.SubscribeAck{
+	s.wrQueue.add(packet.SubscribeAck{
 		PacketId:    sub.PacketId,
 		ReturnCodes: retCodes,
 	})
 }
 
-func (s *Session) eval() {
-	if s.writeWaiting {
-		return
-	}
-
-	write := func(x interface{}) {
-		s.writeWaiting = true
-		go func() {
-			err := s.wr.WritePacket(x)
-			if err != nil {
-				s.writeErrChan <- err
-			} else {
-				s.writeDoneChan <- true
-			}
-		}()
-	}
-
-	if s.pingReq {
-		s.writeWaiting = true
-		s.pingReq = false
-		go write(&packet.PingResp{})
-		return
-	}
-
-	if len(s.subAcks) > 0 {
-		s.writeWaiting = true
-		ack := s.subAcks[0]
-		s.subAcks = s.subAcks[1:]
-		go write(&ack)
-		return
-	}
-
-	if len(s.toPublish) > 0 {
-		s.writeWaiting = true
-		pub := s.toPublish[0]
-		s.toPublish = s.toPublish[1:]
-		fmt.Println("Writing publish")
-		go write(&pub.publish)
-		return
-	}
-}
-
 func (s *Session) pump() {
 	s.subs = newSubscriptions()
-	s.writeErrChan = make(chan error)
-	s.writeDoneChan = make(chan bool)
+	s.wrQueue = newWriteQueue(s.wr)
 	s.publishChan = make(chan *publish)
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
@@ -137,6 +88,7 @@ func (s *Session) pump() {
 	for {
 		select {
 		case <-s.stopChan:
+			s.wrQueue.dispose()
 			s.stopChan <- true
 			return
 		case px := <-readPackChan:
@@ -148,7 +100,6 @@ func (s *Session) pump() {
 				// TODO: Close connection, CONNECT not allowed here.
 			case *packet.Subscribe:
 				s.subscribe(p)
-				s.eval()
 			case *packet.Publish:
 				if p.QoS == 0 && !p.Retain {
 					s.publisher.Publish(s, p)
@@ -156,29 +107,24 @@ func (s *Session) pump() {
 					fmt.Println("Not supported")
 				}
 			case *packet.PingReq:
-				s.pingReq = true
+				s.wrQueue.add(&packet.PingResp{})
 			case *packet.Disconnect:
 				return
 			default:
 				fmt.Printf("Received unhandled: %t\n", p)
 			}
-			s.eval()
 		case <-readErrChan:
 			fmt.Println("Receive error")
 			return
-		case <-s.writeErrChan:
-			fmt.Println("Write error")
-		case <-s.writeDoneChan:
-			s.writeWaiting = false
-			s.eval()
+		// Server received a publish in another session, evaluate
+		// the topic and see if it should be sent to this client.
 		case pub := <-s.publishChan:
 			matched, qoS := s.subs.match(&pub.topic)
 			if matched {
 				fmt.Println("Found matching subscription")
 				pub.qoS = packet.QoS(qoS)
 				// Put the publish in internal queue
-				s.toPublish = append(s.toPublish, pub)
-				s.eval()
+				s.wrQueue.add(pub)
 			}
 		}
 	}
@@ -203,6 +149,7 @@ func (s *Session) Stop() {
 	}
 
 	s.stopChan <- true
+	s.wrQueue.dispose()
 	fmt.Println("Requested session stop")
 	<-s.stopChan
 	fmt.Println("Stopped session")
