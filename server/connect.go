@@ -63,11 +63,5 @@ func Connect(conn net.Conn, r Reader,
 	// Reset deadline after CONNECT received
 	conn.SetReadDeadline(time.Time{})
 
-	return &Session{
-		conn:       conn,
-		rd:         r,
-		wr:         w,
-		connPacket: c,
-		id:         c.ClientIdentifier,
-	}, nil
+	return newSession(conn, r, w, c), nil
 }

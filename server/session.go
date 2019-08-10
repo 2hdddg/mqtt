@@ -18,7 +18,6 @@ type publish struct {
 type Session struct {
 	conn        net.Conn
 	rd          Reader
-	wr          Writer
 	publisher   Publisher
 	connPacket  *packet.Connect
 	id          string
@@ -78,10 +77,6 @@ func (s *Session) subscribe(sub *packet.Subscribe) {
 }
 
 func (s *Session) pump() {
-	s.subs = newSubscriptions()
-	s.wrQueue = newWriteQueue(s.wr)
-	s.publishChan = make(chan *publish)
-
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
 
@@ -130,6 +125,20 @@ func (s *Session) pump() {
 				s.wrQueue.add(pub)
 			}
 		}
+	}
+}
+
+func newSession(conn net.Conn, rd Reader, wr Writer,
+	connect *packet.Connect) *Session {
+
+	return &Session{
+		conn:        conn,
+		rd:          rd,
+		connPacket:  connect,
+		id:          connect.ClientIdentifier,
+		subs:        newSubscriptions(),
+		wrQueue:     newWriteQueue(wr),
+		publishChan: make(chan *publish),
 	}
 }
 
