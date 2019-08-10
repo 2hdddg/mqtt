@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-
 	"testing"
 
 	"github.com/2hdddg/mqtt/packet"
@@ -61,7 +60,7 @@ func TestConnect(t *testing.T) {
 		r := tNewReaderFake(t)
 		w := &WriterFake{
 			err:     c.writeAckErr,
-			written: make(chan interface{}, 3),
+			written: make(chan packet.Packet, 3),
 		}
 		conn := &ConnFake{}
 		au := &AuthFake{}

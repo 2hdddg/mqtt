@@ -28,11 +28,11 @@ type Session struct {
 }
 
 type Reader interface {
-	ReadPacket(version uint8) (interface{}, error)
+	ReadPacket(version uint8) (packet.Packet, error)
 }
 
 type Writer interface {
-	WritePacket(packet interface{}) error
+	WritePacket(packet packet.Packet) error
 }
 
 type Authorize interface {

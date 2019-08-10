@@ -13,7 +13,7 @@ type packetize interface {
 	toPacket() []byte
 }
 
-func (w *Writer) WritePacket(packet interface{}) error {
+func (w *Writer) WritePacket(packet Packet) error {
 	p, ok := packet.(packetize)
 	if !ok {
 		return errors.New("Wrong type")

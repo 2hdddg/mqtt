@@ -9,19 +9,19 @@ import (
 )
 
 type ReaderFake struct {
-	pack chan interface{}
+	pack chan packet.Packet
 	err  chan error
 }
 
 func tNewReaderFake(t *testing.T) *ReaderFake {
 	return &ReaderFake{
-		pack: make(chan interface{}, 1),
+		pack: make(chan packet.Packet, 1),
 		err:  make(chan error, 1),
 	}
 }
 
 // Implements Reader interface
-func (r *ReaderFake) ReadPacket(version uint8) (interface{}, error) {
+func (r *ReaderFake) ReadPacket(version uint8) (packet.Packet, error) {
 	for {
 		select {
 		case p := <-r.pack:
@@ -32,16 +32,16 @@ func (r *ReaderFake) ReadPacket(version uint8) (interface{}, error) {
 	}
 }
 
-func (r *ReaderFake) tWritePacket(p interface{}) {
+func (r *ReaderFake) tWritePacket(p packet.Packet) {
 	r.pack <- p
 }
 
 type WriterFake struct {
 	err     error
-	written chan interface{}
+	written chan packet.Packet
 }
 
-func (w *WriterFake) WritePacket(p interface{}) error {
+func (w *WriterFake) WritePacket(p packet.Packet) error {
 	w.written <- p
 	return w.err
 }
@@ -109,7 +109,7 @@ func tSession(
 		ClientIdentifier: "xyz",
 	}
 	wr := &WriterFake{
-		written: make(chan interface{}, 3),
+		written: make(chan packet.Packet, 3),
 	}
 	conn := &ConnFake{}
 	pub := NewPubFake()

@@ -68,7 +68,9 @@ type Reader struct {
 	*bufio.Reader
 }
 
-func (r *Reader) ReadPacket(version uint8) (interface{}, error) {
+type Packet interface{}
+
+func (r *Reader) ReadPacket(version uint8) (Packet, error) {
 	// Read fixed header
 	ctrlAndFlags, err := r.ReadByte()
 	if err != nil {
@@ -97,7 +99,7 @@ func (r *Reader) ReadPacket(version uint8) (interface{}, error) {
 	}
 	r = &Reader{bufio.NewReader(bytes.NewBuffer(buf))}
 
-	var p interface{}
+	var p Packet
 	switch t {
 	case CONNECT:
 		p, err = r.readConnect(f)
