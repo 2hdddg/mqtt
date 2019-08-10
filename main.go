@@ -46,7 +46,7 @@ func (_ *publisher) Publish(s *server.Session, p *packet.Publish) error {
 		}
 
 		fmt.Println("Sending publish to session", cid)
-		sess.Publish(tn, []byte{})
+		sess.EvalPublish(tn, p)
 	}
 	return nil
 }

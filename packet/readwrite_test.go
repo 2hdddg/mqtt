@@ -23,6 +23,7 @@ func TestWriteReadPacket(t *testing.T) {
 			Retain:    true,
 			Topic:     "the topic",
 			PacketId:  0xfffe,
+			Payload:   []byte{0xfe, 0xff, 01, 02},
 		}},
 		{&PingReq{}},
 		{&PingResp{}},

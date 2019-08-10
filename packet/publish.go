@@ -1,11 +1,14 @@
 package packet
 
+import "io"
+
 type Publish struct {
 	Duplicate bool
 	QoS       QoS
 	Retain    bool
 	Topic     string
 	PacketId  uint16
+	Payload   []byte
 }
 
 func (r *Reader) readPublish(fixflags uint8) (*Publish, error) {
@@ -38,15 +41,33 @@ func (r *Reader) readPublish(fixflags uint8) (*Publish, error) {
 		}
 	}
 
+	// TODO: If protocol version > 4 there are properties to read here!
+
+	p.Payload = make([]byte, 0, 256)
+	// Read payload
+	for {
+		b, err := r.ReadByte()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		p.Payload = append(p.Payload, b)
+	}
+
 	return p, nil
 }
 
 func (p *Publish) toPacket() []byte {
 	// Variable header
-	v := strToBytes(p.Topic)
+	v := make([]byte, 0, len(p.Topic)+2+len(p.Payload)+4)
+	v = append(v, strToBytes(p.Topic)...)
 	if p.QoS == QoS1 || p.QoS == QoS2 {
 		v = append(v, toInt2(p.PacketId)...)
 	}
+	// Write payload
+	v = append(v, p.Payload...)
 
 	rem := toVarInt(uint32(len(v)))
 	h := make([]uint8, 1, len(v)+len(rem)+1)

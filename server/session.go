@@ -14,21 +14,30 @@ type subscription struct {
 	qoS    packet.QoS
 }
 
+type publish struct {
+	topic   topic.Name
+	publish packet.Publish
+	qoS     packet.QoS
+}
+
 type Session struct {
-	conn          net.Conn
-	rd            Reader
-	wr            Writer
-	publisher     Publisher
-	connPacket    *packet.Connect
-	id            string
-	alive         bool
-	stopChan      chan bool
-	subs          []subscription
+	conn       net.Conn
+	rd         Reader
+	wr         Writer
+	publisher  Publisher
+	connPacket *packet.Connect
+	id         string
+	alive      bool
+	stopChan   chan bool
+	subs       []subscription
+
 	writeWaiting  bool
 	writeErrChan  chan error
 	writeDoneChan chan bool
 	pingReq       bool
 	subAcks       []packet.SubscribeAck
+	publishChan   chan *publish
+	toPublish     []*publish
 }
 
 type Reader interface {
@@ -63,7 +72,8 @@ func (s *Session) ClientId() string {
 	return s.id
 }
 
-func (s *Session) Publish(tn *topic.Name, payload []byte) error {
+func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
+	s.publishChan <- &publish{topic: *tn, publish: *p}
 	return nil
 }
 
@@ -119,11 +129,21 @@ func (s *Session) eval() {
 		go write(&ack)
 		return
 	}
+
+	if len(s.toPublish) > 0 {
+		s.writeWaiting = true
+		pub := s.toPublish[0]
+		s.toPublish = s.toPublish[1:]
+		fmt.Println("Writing publish")
+		go write(&pub.publish)
+		return
+	}
 }
 
 func (s *Session) pump() {
 	s.writeErrChan = make(chan error)
 	s.writeDoneChan = make(chan bool)
+	s.publishChan = make(chan *publish)
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
 	go read(s.rd, readPackChan, readErrChan)
@@ -165,6 +185,24 @@ func (s *Session) pump() {
 		case <-s.writeDoneChan:
 			s.writeWaiting = false
 			s.eval()
+		case pub := <-s.publishChan:
+			qoS := -1
+			for _, sub := range s.subs {
+				fmt.Println("Evaluating subscription", sub)
+				if sub.filter.Match(&pub.topic) {
+					if int(sub.qoS) > qoS {
+						qoS = int(sub.qoS)
+					}
+				}
+			}
+
+			if qoS != -1 {
+				fmt.Println("Found matching subscription")
+				pub.qoS = packet.QoS(qoS)
+				// Put the publish in internal queue
+				s.toPublish = append(s.toPublish, pub)
+				s.eval()
+			}
 		}
 	}
 }
