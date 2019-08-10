@@ -5,23 +5,26 @@ import (
 )
 
 type writeQueue struct {
-	wr      Writer
-	q       *list.List
-	addChan chan interface{}
+	wr       Writer
+	q        *list.List
+	addChan  chan interface{}
+	stopChan chan bool
 }
 
 func newWriteQueue(wr Writer) *writeQueue {
 	q := &writeQueue{
-		wr:      wr,
-		q:       list.New(),
-		addChan: make(chan interface{}),
+		wr:       wr,
+		q:        list.New(),
+		addChan:  make(chan interface{}),
+		stopChan: make(chan bool),
 	}
 	go q.monitor()
 	return q
 }
 
-func (q *writeQueue) dispose() {
-	close(q.addChan)
+func (q *writeQueue) flush() {
+	q.stopChan <- true
+	<-q.stopChan
 }
 
 func (q *writeQueue) add(x interface{}) {
@@ -31,6 +34,7 @@ func (q *writeQueue) add(x interface{}) {
 func (q *writeQueue) monitor() {
 	writing := false
 	wrChan := make(chan error)
+	stopped := false
 
 	write := func() {
 		if writing {
@@ -55,7 +59,17 @@ func (q *writeQueue) monitor() {
 			write()
 		case <-wrChan:
 			writing = false
+			if stopped {
+				q.stopChan <- false
+				return
+			}
 			write()
+		case <-q.stopChan:
+			stopped = true
+			if !writing {
+				q.stopChan <- false
+				return
+			}
 		}
 	}
 }

@@ -81,15 +81,18 @@ func (s *Session) pump() {
 	s.subs = newSubscriptions()
 	s.wrQueue = newWriteQueue(s.wr)
 	s.publishChan = make(chan *publish)
+
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
+
+	// Start reading immediately, triggers all other action!
 	go read(s.rd, readPackChan, readErrChan)
 
 	for {
 		select {
 		case <-s.stopChan:
-			s.wrQueue.dispose()
 			s.stopChan <- true
+			s.wrQueue.flush()
 			return
 		case px := <-readPackChan:
 			// Start reader immediately again
@@ -149,7 +152,6 @@ func (s *Session) Stop() {
 	}
 
 	s.stopChan <- true
-	s.wrQueue.dispose()
 	fmt.Println("Requested session stop")
 	<-s.stopChan
 	fmt.Println("Stopped session")

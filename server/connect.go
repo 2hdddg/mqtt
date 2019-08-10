@@ -8,7 +8,8 @@ import (
 	"github.com/2hdddg/mqtt/packet"
 )
 
-func Connect(conn net.Conn, r Reader, w Writer, a Authorize) (*Session, error) {
+func Connect(conn net.Conn, r Reader,
+	w Writer, a Authorize) (*Session, error) {
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
