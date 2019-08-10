@@ -9,11 +9,6 @@ import (
 	"github.com/2hdddg/mqtt/topic"
 )
 
-type subscription struct {
-	filter topic.Filter
-	qoS    packet.QoS
-}
-
 type publish struct {
 	topic   topic.Name
 	publish packet.Publish
@@ -27,9 +22,8 @@ type Session struct {
 	publisher  Publisher
 	connPacket *packet.Connect
 	id         string
-	alive      bool
 	stopChan   chan bool
-	subs       []subscription
+	subs       *subscriptions
 
 	writeWaiting  bool
 	writeErrChan  chan error
@@ -79,17 +73,8 @@ func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
 
 func (s *Session) subscribe(sub *packet.Subscribe) {
 	retCodes := make([]packet.QoS, len(sub.Subscriptions))
-	for i, x := range sub.Subscriptions {
-		filter := topic.NewFilter(x.Topic)
-		if filter != nil {
-			retCodes[i] = x.QoS
-			s.subs = append(s.subs, subscription{
-				filter: *filter,
-				qoS:    x.QoS,
-			})
-		} else {
-			retCodes[i] = packet.QoSFailure
-		}
+	for i, _ := range sub.Subscriptions {
+		retCodes[i] = s.subs.subscribe(&sub.Subscriptions[i])
 	}
 
 	s.subAcks = append(s.subAcks, packet.SubscribeAck{
@@ -141,6 +126,7 @@ func (s *Session) eval() {
 }
 
 func (s *Session) pump() {
+	s.subs = newSubscriptions()
 	s.writeErrChan = make(chan error)
 	s.writeDoneChan = make(chan bool)
 	s.publishChan = make(chan *publish)
@@ -186,17 +172,8 @@ func (s *Session) pump() {
 			s.writeWaiting = false
 			s.eval()
 		case pub := <-s.publishChan:
-			qoS := -1
-			for _, sub := range s.subs {
-				fmt.Println("Evaluating subscription", sub)
-				if sub.filter.Match(&pub.topic) {
-					if int(sub.qoS) > qoS {
-						qoS = int(sub.qoS)
-					}
-				}
-			}
-
-			if qoS != -1 {
+			matched, qoS := s.subs.match(&pub.topic)
+			if matched {
 				fmt.Println("Found matching subscription")
 				pub.qoS = packet.QoS(qoS)
 				// Put the publish in internal queue
