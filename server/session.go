@@ -70,7 +70,7 @@ func (s *Session) subscribe(sub *packet.Subscribe) {
 		retCodes[i] = s.subs.subscribe(&sub.Subscriptions[i])
 	}
 
-	s.wrQueue.add(packet.SubscribeAck{
+	s.wrQueue.add(&packet.SubscribeAck{
 		PacketId:    sub.PacketId,
 		ReturnCodes: retCodes,
 	})
@@ -122,7 +122,7 @@ func (s *Session) pump() {
 				fmt.Println("Found matching subscription")
 				pub.qoS = packet.QoS(qoS)
 				// Put the publish in internal queue
-				s.wrQueue.add(pub)
+				s.wrQueue.add(&pub.publish)
 			}
 		}
 	}

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -99,29 +98,23 @@ func (f *PubFake) Publish(s *Session, p *packet.Publish) error {
 	return nil
 }
 
-func tConnect(t *testing.T) (*Session, *ReaderFake, *WriterFake, *PubFake) {
-	fmt.Println("tConnect")
-	r := tNewReaderFake(t)
-	r.pack <- &packet.Connect{
+func tSession(
+	t *testing.T) (*Session, *ReaderFake, *WriterFake, *PubFake) {
+
+	rd := tNewReaderFake(t)
+	connect := &packet.Connect{
 		ProtocolName:     "MQTT",
 		ProtocolVersion:  4,
 		KeepAliveSecs:    30,
 		ClientIdentifier: "xyz",
 	}
-	w := &WriterFake{
+	wr := &WriterFake{
 		written: make(chan interface{}, 3),
 	}
-	au := &AuthFake{}
 	conn := &ConnFake{}
 	pub := NewPubFake()
-	// Connect to get a proper session
-	sess, _ := Connect(conn, r, w, au)
-	if sess == nil {
-		t.Fatalf("Could not connect to create session")
-	}
+	sess := newSession(conn, rd, wr, connect)
 	sess.Start(pub)
-	// Empty connect ack
-	<-w.written
-	return sess, r, w, pub
+	return sess, rd, wr, pub
 }
 
