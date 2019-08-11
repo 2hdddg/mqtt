@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/2hdddg/mqtt/packet"
+	"github.com/2hdddg/mqtt/publish"
 	"github.com/2hdddg/mqtt/topic"
 )
 
@@ -25,8 +26,8 @@ type Session struct {
 	subs             *subscriptions
 	wrQueue          *writeQueue
 	maybePublishChan chan *maybePublish
-	unacknowledged   map[uint16]*packet.Publish
 	packetIdChan     chan uint16
+	publishReceived  *publish.Receiver
 }
 
 type Reader interface {
@@ -131,33 +132,10 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 		return
 	}
 
-	if p.QoS > packet.QoS1 {
-		fmt.Println("QoS above 1 is not implemented")
-		return
-	}
-
-	switch p.QoS {
-	// QoS 0
-	case packet.QoS0:
-		// Notify framework that we received a PUBLISH packet, it's up
-		// to the framework to distribute this to other sessions.
-		s.publisher.Publish(s, p)
-
-	// QoS 1:
-	// MUST respond with a PUBACK Packet containing the Packet Identifier
-	// from the incoming PUBLISH Packet, having accepted ownership of the
-	// Application Message.
-	//
-	// After it has sent a PUBACK Packet the Receiver MUST treat any
-	// incoming PUBLISH packet that contains the same Packet Identifier
-	// as being a new publication, irrespective of the setting of its DUP
-	// flag.
-	case packet.QoS1:
-		s.unacknowledged[p.PacketId] = p
-		ack := &packet.PublishAck{PacketId: p.PacketId}
-		s.writeAndAwaitPacketId(ack, p.PacketId)
-
-	default:
+	// Delegate to state handler
+	err := s.publishReceived.Received(p)
+	if err != nil {
+		fmt.Println(err)
 	}
 }
 
@@ -246,13 +224,10 @@ func (s *Session) pump() {
 		case maybe := <-s.maybePublishChan:
 			s.maybeSendPublish(maybe)
 
-		// Confirmed write of a packet with id
+		// Confirmed write of a packet related to packetid
 		case packetId := <-s.packetIdChan:
-			p, exists := s.unacknowledged[packetId]
-			if exists && p != nil {
-				s.publisher.Publish(s, p)
-				delete(s.unacknowledged, packetId)
-			}
+			// Delegate to state handler
+			s.publishReceived.Ack(packetId)
 
 		// Stop requested
 		case <-s.stopChan:
@@ -275,16 +250,20 @@ func newSession(conn net.Conn, rd Reader, wr Writer,
 		wrQueue:          newWriteQueue(wr),
 		maybePublishChan: make(chan *maybePublish),
 		packetIdChan:     make(chan uint16),
-		unacknowledged:   make(map[uint16]*packet.Publish),
 	}
 }
 
-func (s *Session) Start(p Publisher) error {
+func (s *Session) Start(pub Publisher) error {
 	if s.stopChan != nil {
 		return errors.New("Already started")
 	}
 
-	s.publisher = p
+	s.publishReceived = publish.NewReceiver(
+		func(p *packet.Publish) {
+			pub.Publish(s, p)
+		},
+		s.writeAndAwaitPacketId)
+
 	s.stopChan = make(chan bool)
 	go s.pump()
 	fmt.Println("Started session")
