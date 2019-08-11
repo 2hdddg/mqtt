@@ -2,20 +2,27 @@ package server
 
 import (
 	"container/list"
+
+	"github.com/2hdddg/mqtt/packet"
 )
 
 type writeQueue struct {
 	wr       Writer
 	q        *list.List
-	addChan  chan interface{}
+	addChan  chan *writeQueueItem
 	stopChan chan bool
+}
+
+type writeQueueItem struct {
+	packet  packet.Packet
+	written func()
 }
 
 func newWriteQueue(wr Writer) *writeQueue {
 	q := &writeQueue{
 		wr:       wr,
 		q:        list.New(),
-		addChan:  make(chan interface{}),
+		addChan:  make(chan *writeQueueItem),
 		stopChan: make(chan bool),
 	}
 	go q.monitor()
@@ -27,8 +34,8 @@ func (q *writeQueue) flush() {
 	<-q.stopChan
 }
 
-func (q *writeQueue) add(x interface{}) {
-	q.addChan <- x
+func (q *writeQueue) add(i *writeQueueItem) {
+	q.addChan <- i
 }
 
 func (q *writeQueue) monitor() {
@@ -46,9 +53,13 @@ func (q *writeQueue) monitor() {
 		writing = true
 		e := q.q.Front()
 		q.q.Remove(e)
+		i := e.Value.(*writeQueueItem)
 		go func() {
-			err := q.wr.WritePacket(e.Value)
+			err := q.wr.WritePacket(i.packet)
 			wrChan <- err
+			if i.written != nil {
+				i.written()
+			}
 		}()
 	}
 

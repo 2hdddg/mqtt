@@ -25,6 +25,8 @@ type Session struct {
 	subs             *subscriptions
 	wrQueue          *writeQueue
 	maybePublishChan chan *maybePublish
+	unacknowledged   map[uint16]*packet.Publish
+	packetIdChan     chan uint16
 }
 
 type Reader interface {
@@ -69,6 +71,21 @@ func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
 	return nil
 }
 
+func (s *Session) writeAndForgetPacket(p packet.Packet) {
+	i := &writeQueueItem{packet: p}
+	s.wrQueue.add(i)
+}
+
+func (s *Session) writeAndAwaitPacketId(p packet.Packet, id uint16) {
+	i := &writeQueueItem{
+		packet: p,
+		written: func() {
+			s.packetIdChan <- id
+		},
+	}
+	s.wrQueue.add(i)
+}
+
 func (s *Session) receivedSubscribe(sub *packet.Subscribe) {
 	// The SUBACK Packet sent by the Server to the Client MUST contain a
 	// return code for each Topic Filter/QoS pair. This return code
@@ -91,7 +108,7 @@ func (s *Session) receivedSubscribe(sub *packet.Subscribe) {
 	// the Server MUST respond with a SUBACK Packet [MQTT-3.8.4-1].
 	// The SUBACK Packet MUST have the same Packet Identifier as the
 	// SUBSCRIBE Packet that it is acknowledging [MQTT-3.8.4-2].
-	s.wrQueue.add(&packet.SubscribeAck{
+	s.writeAndForgetPacket(&packet.SubscribeAck{
 		PacketId:    sub.PacketId,
 		ReturnCodes: retCodes,
 	})
@@ -114,14 +131,34 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 		return
 	}
 
-	if p.QoS > packet.QoS0 {
-		fmt.Println("QoS above 0 is not implemented")
+	if p.QoS > packet.QoS1 {
+		fmt.Println("QoS above 1 is not implemented")
 		return
 	}
 
-	// Notify framework that we received a PUBLISH packet, it's up
-	// to the framework to distribute this to other sessions.
-	s.publisher.Publish(s, p)
+	switch p.QoS {
+	// QoS 0
+	case packet.QoS0:
+		// Notify framework that we received a PUBLISH packet, it's up
+		// to the framework to distribute this to other sessions.
+		s.publisher.Publish(s, p)
+
+	// QoS 1:
+	// MUST respond with a PUBACK Packet containing the Packet Identifier
+	// from the incoming PUBLISH Packet, having accepted ownership of the
+	// Application Message.
+	//
+	// After it has sent a PUBACK Packet the Receiver MUST treat any
+	// incoming PUBLISH packet that contains the same Packet Identifier
+	// as being a new publication, irrespective of the setting of its DUP
+	// flag.
+	case packet.QoS1:
+		s.unacknowledged[p.PacketId] = p
+		ack := &packet.PublishAck{PacketId: p.PacketId}
+		s.writeAndAwaitPacketId(ack, p.PacketId)
+
+	default:
+	}
 }
 
 func (s *Session) maybeSendPublish(m *maybePublish) {
@@ -159,7 +196,7 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	p.QoS = maxQoS
 
 	// Publish
-	s.wrQueue.add(p)
+	s.writeAndForgetPacket(p)
 }
 
 func (s *Session) received(px packet.Packet) {
@@ -174,7 +211,7 @@ func (s *Session) received(px packet.Packet) {
 		s.receivedPublish(p)
 
 	case *packet.PingReq:
-		s.wrQueue.add(&packet.PingResp{})
+		s.writeAndForgetPacket(&packet.PingResp{})
 
 	case *packet.Disconnect:
 		return
@@ -209,6 +246,14 @@ func (s *Session) pump() {
 		case maybe := <-s.maybePublishChan:
 			s.maybeSendPublish(maybe)
 
+		// Confirmed write of a packet with id
+		case packetId := <-s.packetIdChan:
+			p, exists := s.unacknowledged[packetId]
+			if exists && p != nil {
+				s.publisher.Publish(s, p)
+				delete(s.unacknowledged, packetId)
+			}
+
 		// Stop requested
 		case <-s.stopChan:
 			s.stopChan <- true
@@ -229,6 +274,8 @@ func newSession(conn net.Conn, rd Reader, wr Writer,
 		subs:             newSubscriptions(),
 		wrQueue:          newWriteQueue(wr),
 		maybePublishChan: make(chan *maybePublish),
+		packetIdChan:     make(chan uint16),
+		unacknowledged:   make(map[uint16]*packet.Publish),
 	}
 }
 
