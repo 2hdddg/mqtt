@@ -26,6 +26,16 @@ func NewReceiver(accept Accept, wrQueue *writequeue.Queue) *Receiver {
 	}
 }
 
+func (r *Receiver) written(packetId uint16) {
+	r.mut.Lock()
+	p, exists := r.packets[packetId]
+	if exists && p != nil {
+		go r.accept(p)
+		delete(r.packets, packetId)
+	}
+	r.mut.Unlock()
+}
+
 func (r *Receiver) Received(p *packet.Publish) error {
 	switch p.QoS {
 	case packet.QoS0:
@@ -38,13 +48,7 @@ func (r *Receiver) Received(p *packet.Publish) error {
 		r.wrQueue.Add(&writequeue.Item{
 			Packet: ack,
 			Written: func() {
-				r.mut.Lock()
-				p, exists := r.packets[p.PacketId]
-				if exists && p != nil {
-					go r.accept(p)
-					delete(r.packets, p.PacketId)
-				}
-				r.mut.Unlock()
+				r.written(p.PacketId)
 			},
 		})
 	case packet.QoS2:

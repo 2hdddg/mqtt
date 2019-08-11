@@ -182,7 +182,7 @@ func (s *Session) received(px packet.Packet) {
 		s.write(&packet.PingResp{})
 
 	case *packet.Disconnect:
-		return
+		s.conn.Close()
 
 	default:
 		fmt.Printf("Received unhandled: %t\n", p)
