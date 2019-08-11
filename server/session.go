@@ -70,11 +70,27 @@ func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
 }
 
 func (s *Session) receivedSubscribe(sub *packet.Subscribe) {
+	// The SUBACK Packet sent by the Server to the Client MUST contain a
+	// return code for each Topic Filter/QoS pair. This return code
+	// MUST either show the maximum QoS that was granted for that
+	// Subscription or indicate that the subscription failed
+	// [MQTT-3.8.4-5]. The Server might grant a lower maximum QoS than
+	// the subscriber requested. The QoS of Payload Messages sent in
+	// response to a Subscription MUST be the minimum of the QoS of the
+	// originally published message and the maximum QoS granted by the
+	// Server. The server is permitted to send duplicate copies of a
+	// message to a subscriber in the case where the original message
+	// was published with QoS 1 and the maximum QoS granted was QoS 0
+	// [MQTT-3.8.4-6].
 	retCodes := make([]packet.QoS, len(sub.Subscriptions))
 	for i, _ := range sub.Subscriptions {
 		retCodes[i] = s.subs.subscribe(&sub.Subscriptions[i])
 	}
 
+	// When the Server receives a SUBSCRIBE Packet from a Client,
+	// the Server MUST respond with a SUBACK Packet [MQTT-3.8.4-1].
+	// The SUBACK Packet MUST have the same Packet Identifier as the
+	// SUBSCRIBE Packet that it is acknowledging [MQTT-3.8.4-2].
 	s.wrQueue.add(&packet.SubscribeAck{
 		PacketId:    sub.PacketId,
 		ReturnCodes: retCodes,

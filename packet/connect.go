@@ -2,6 +2,9 @@ package packet
 
 type QoS uint8
 
+// QoS 0: At most once delivery
+// QoS 1: At least once delivery
+// QoS 2: Exactly once delivery
 const (
 	QoS0       QoS = 0x00
 	QoS1       QoS = 0x01
