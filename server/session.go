@@ -8,6 +8,7 @@ import (
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/publish"
 	"github.com/2hdddg/mqtt/topic"
+	"github.com/2hdddg/mqtt/writequeue"
 )
 
 type maybePublish struct {
@@ -24,9 +25,8 @@ type Session struct {
 	id               string
 	stopChan         chan bool
 	subs             *subscriptions
-	wrQueue          *writeQueue
+	wrQueue          *writequeue.Queue
 	maybePublishChan chan *maybePublish
-	packetIdChan     chan uint16
 	publishReceived  *publish.Receiver
 }
 
@@ -72,19 +72,9 @@ func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
 	return nil
 }
 
-func (s *Session) writeAndForgetPacket(p packet.Packet) {
-	i := &writeQueueItem{packet: p}
-	s.wrQueue.add(i)
-}
-
-func (s *Session) writeAndAwaitPacketId(p packet.Packet, id uint16) {
-	i := &writeQueueItem{
-		packet: p,
-		written: func() {
-			s.packetIdChan <- id
-		},
-	}
-	s.wrQueue.add(i)
+func (s *Session) write(p packet.Packet) {
+	i := &writequeue.Item{Packet: p}
+	s.wrQueue.Add(i)
 }
 
 func (s *Session) receivedSubscribe(sub *packet.Subscribe) {
@@ -109,7 +99,7 @@ func (s *Session) receivedSubscribe(sub *packet.Subscribe) {
 	// the Server MUST respond with a SUBACK Packet [MQTT-3.8.4-1].
 	// The SUBACK Packet MUST have the same Packet Identifier as the
 	// SUBSCRIBE Packet that it is acknowledging [MQTT-3.8.4-2].
-	s.writeAndForgetPacket(&packet.SubscribeAck{
+	s.write(&packet.SubscribeAck{
 		PacketId:    sub.PacketId,
 		ReturnCodes: retCodes,
 	})
@@ -174,7 +164,7 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	p.QoS = maxQoS
 
 	// Publish
-	s.writeAndForgetPacket(p)
+	s.write(p)
 }
 
 func (s *Session) received(px packet.Packet) {
@@ -189,7 +179,7 @@ func (s *Session) received(px packet.Packet) {
 		s.receivedPublish(p)
 
 	case *packet.PingReq:
-		s.writeAndForgetPacket(&packet.PingResp{})
+		s.write(&packet.PingResp{})
 
 	case *packet.Disconnect:
 		return
@@ -224,15 +214,10 @@ func (s *Session) pump() {
 		case maybe := <-s.maybePublishChan:
 			s.maybeSendPublish(maybe)
 
-		// Confirmed write of a packet related to packetid
-		case packetId := <-s.packetIdChan:
-			// Delegate to state handler
-			s.publishReceived.Ack(packetId)
-
 		// Stop requested
 		case <-s.stopChan:
 			s.stopChan <- true
-			s.wrQueue.flush()
+			s.wrQueue.Flush()
 			return
 		}
 	}
@@ -247,9 +232,8 @@ func newSession(conn net.Conn, rd Reader, wr Writer,
 		connPacket:       connect,
 		id:               connect.ClientIdentifier,
 		subs:             newSubscriptions(),
-		wrQueue:          newWriteQueue(wr),
+		wrQueue:          writequeue.New(wr),
 		maybePublishChan: make(chan *maybePublish),
-		packetIdChan:     make(chan uint16),
 	}
 }
 
@@ -261,8 +245,7 @@ func (s *Session) Start(pub Publisher) error {
 	s.publishReceived = publish.NewReceiver(
 		func(p *packet.Publish) {
 			pub.Publish(s, p)
-		},
-		s.writeAndAwaitPacketId)
+		}, s.wrQueue)
 
 	s.stopChan = make(chan bool)
 	go s.pump()

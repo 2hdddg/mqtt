@@ -1,4 +1,4 @@
-package server
+package writequeue
 
 import (
 	"container/list"
@@ -6,39 +6,43 @@ import (
 	"github.com/2hdddg/mqtt/packet"
 )
 
-type writeQueue struct {
+type Writer interface {
+	WritePacket(packet packet.Packet) error
+}
+
+type Queue struct {
 	wr       Writer
 	q        *list.List
-	addChan  chan *writeQueueItem
+	addChan  chan *Item
 	stopChan chan bool
 }
 
-type writeQueueItem struct {
-	packet  packet.Packet
-	written func()
+type Item struct {
+	Packet  packet.Packet
+	Written func()
 }
 
-func newWriteQueue(wr Writer) *writeQueue {
-	q := &writeQueue{
+func New(wr Writer) *Queue {
+	q := &Queue{
 		wr:       wr,
 		q:        list.New(),
-		addChan:  make(chan *writeQueueItem),
+		addChan:  make(chan *Item),
 		stopChan: make(chan bool),
 	}
 	go q.monitor()
 	return q
 }
 
-func (q *writeQueue) flush() {
+func (q *Queue) Flush() {
 	q.stopChan <- true
 	<-q.stopChan
 }
 
-func (q *writeQueue) add(i *writeQueueItem) {
+func (q *Queue) Add(i *Item) {
 	q.addChan <- i
 }
 
-func (q *writeQueue) monitor() {
+func (q *Queue) monitor() {
 	writing := false
 	wrChan := make(chan error)
 	stopped := false
@@ -53,12 +57,12 @@ func (q *writeQueue) monitor() {
 		writing = true
 		e := q.q.Front()
 		q.q.Remove(e)
-		i := e.Value.(*writeQueueItem)
+		i := e.Value.(*Item)
 		go func() {
-			err := q.wr.WritePacket(i.packet)
+			err := q.wr.WritePacket(i.Packet)
 			wrChan <- err
-			if i.written != nil {
-				i.written()
+			if i.Written != nil {
+				i.Written()
 			}
 		}()
 	}
