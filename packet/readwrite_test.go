@@ -41,6 +41,9 @@ func TestWriteReadPacket(t *testing.T) {
 				QoS1, QoS0, QoS2, QoSFailure,
 			},
 		}},
+		{&PublishAck{
+			PacketId: 0x1234,
+		}},
 	}
 
 	for _, c := range testcases {

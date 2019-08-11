@@ -107,6 +107,8 @@ func (r *Reader) ReadPacket(version uint8) (Packet, error) {
 		p, err = r.readDisconnect(f)
 	case PUBLISH:
 		p, err = r.readPublish(f)
+	case PUBACK:
+		p, err = r.readPublishAck(f)
 	case PINGREQ:
 		p, err = r.readPingReq(f)
 	case PINGRESP:
