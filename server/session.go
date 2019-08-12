@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/publish"
@@ -17,8 +18,16 @@ type maybePublish struct {
 	qoS     packet.QoS
 }
 
+type connState byte
+
+const (
+	connStateUp           connState = 0
+	connStateDisconnected connState = 1
+)
+
 type Session struct {
 	conn             net.Conn
+	connState        connState
 	rd               Reader
 	publisher        Publisher
 	connPacket       *packet.Connect
@@ -203,6 +212,7 @@ func (s *Session) received(px packet.Packet) {
 
 	case *packet.Disconnect:
 		s.log.Info("Received DISCONNECT")
+		s.connState = connStateDisconnected
 		s.conn.Close()
 
 	default:
@@ -214,20 +224,29 @@ func (s *Session) pump() {
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
 
+	readWDeadline := func() {
+		keepAlive := time.Duration(s.connPacket.KeepAliveSecs)
+		keepAlive *= time.Second
+		fmt.Println("Deadline", keepAlive)
+		if keepAlive > 0 {
+			s.conn.SetReadDeadline(time.Now().Add(keepAlive))
+		}
+		go read(s.rd, readPackChan, readErrChan)
+	}
 	// Start reading immediately
-	go read(s.rd, readPackChan, readErrChan)
+	readWDeadline()
 
-	for {
+	for s.connState == connStateUp {
 		select {
 		// Received packet
 		case px := <-readPackChan:
 			// Start reader immediately again
-			go read(s.rd, readPackChan, readErrChan)
+			readWDeadline()
 			s.received(px)
 
 		// Read failure
-		case <-readErrChan:
-			s.log.Error("Receive error")
+		case err := <-readErrChan:
+			s.log.Error(fmt.Sprintf("Receive error %s", err))
 			return
 
 		// Server received a publish in another session, evaluate
