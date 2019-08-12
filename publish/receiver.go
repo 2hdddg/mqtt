@@ -10,19 +10,30 @@ import (
 
 type Accept func(p *packet.Publish)
 
+type Logger interface {
+	Info(s string)
+	Error(s string)
+	Debug(s string)
+}
+
 type Receiver struct {
 	packets map[uint16]*packet.Publish
 	accept  Accept
 	wrQueue *writequeue.Queue
 	mut     *sync.Mutex
+	log     Logger
 }
 
-func NewReceiver(accept Accept, wrQueue *writequeue.Queue) *Receiver {
+func NewReceiver(
+	accept Accept, wrQueue *writequeue.Queue,
+	log Logger) *Receiver {
+
 	return &Receiver{
 		accept:  accept,
 		wrQueue: wrQueue,
 		packets: make(map[uint16]*packet.Publish),
 		mut:     &sync.Mutex{},
+		log:     log,
 	}
 }
 
@@ -49,6 +60,7 @@ func (r *Receiver) Received(p *packet.Publish) error {
 			Packet: ack,
 			Written: func() {
 				r.written(p.PacketId)
+				r.log.Info("Sent PUBACK")
 			},
 		})
 	case packet.QoS2:

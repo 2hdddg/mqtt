@@ -23,6 +23,7 @@ type connState byte
 const (
 	connStateUp           connState = 0
 	connStateDisconnected connState = 1
+	connStateError        connState = 2
 )
 
 type Session struct {
@@ -54,6 +55,7 @@ type Authorize interface {
 
 type Publisher interface {
 	Publish(s *Session, p *packet.Publish) error
+	Stopped(s *Session)
 }
 
 type Logger interface {
@@ -65,7 +67,6 @@ type Logger interface {
 func read(
 	rd Reader, packetChan chan interface{}, errorChan chan error) {
 
-	// TODO: Set read deadline
 	p, err := rd.ReadPacket(4)
 	if err != nil {
 		errorChan <- err
@@ -196,7 +197,8 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 func (s *Session) received(px packet.Packet) {
 	switch p := px.(type) {
 	case *packet.Connect:
-		// TODO: Close connection, CONNECT not allowed here.
+		// CONNECT not allowed here.
+		s.enterConnState(connStateError)
 
 	case *packet.Subscribe:
 		s.log.Info("Received SUBSCRIBE")
@@ -212,8 +214,7 @@ func (s *Session) received(px packet.Packet) {
 
 	case *packet.Disconnect:
 		s.log.Info("Received DISCONNECT")
-		s.connState = connStateDisconnected
-		s.conn.Close()
+		s.enterConnState(connStateDisconnected)
 
 	default:
 		s.log.Error(fmt.Sprintf("Received unhandled packet %t", p))
@@ -224,35 +225,36 @@ func (s *Session) pump() {
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
 
-	readWDeadline := func() {
+	readWDeadlineAsync := func() {
 		keepAlive := time.Duration(s.connPacket.KeepAliveSecs)
 		keepAlive *= time.Second
-		fmt.Println("Deadline", keepAlive)
 		if keepAlive > 0 {
 			s.conn.SetReadDeadline(time.Now().Add(keepAlive))
 		}
 		go read(s.rd, readPackChan, readErrChan)
 	}
-	// Start reading immediately
-	readWDeadline()
 
-	for s.connState == connStateUp {
+	readWDeadlineAsync()
+	for {
 		select {
 		// Received packet
 		case px := <-readPackChan:
-			// Start reader immediately again
-			readWDeadline()
 			s.received(px)
+			if s.connState == connStateUp {
+				readWDeadlineAsync()
+			}
 
 		// Read failure
 		case err := <-readErrChan:
 			s.log.Error(fmt.Sprintf("Receive error %s", err))
-			return
+			s.enterConnState(connStateError)
 
 		// Server received a publish in another session, evaluate
 		// the topic and see if it should be sent to this client.
 		case maybe := <-s.maybePublishChan:
-			s.maybeSendPublish(maybe)
+			if s.connState == connStateUp {
+				s.maybeSendPublish(maybe)
+			}
 
 		// Stop requested
 		case <-s.stopChan:
@@ -261,8 +263,6 @@ func (s *Session) pump() {
 			return
 		}
 	}
-
-	s.log.Debug("Exiting pump")
 }
 
 func newSession(
@@ -280,18 +280,26 @@ func newSession(
 	}
 }
 
+func (s *Session) enterConnState(x connState) {
+	s.connState = x
+	s.conn.Close()
+	s.publisher.Stopped(s)
+	s.log.Info("Entered stopped state")
+}
+
 func (s *Session) Start(pub Publisher, log Logger) error {
 	if s.stopChan != nil {
 		return errors.New("Already started")
 	}
 
+	s.publisher = pub
 	s.log = log
 	s.log.Info("Started")
 	s.publishReceived = publish.NewReceiver(
 		func(p *packet.Publish) {
 			s.log.Info(fmt.Sprintf("Accepted publish of %d", p.PacketId))
 			pub.Publish(s, p)
-		}, s.wrQueue)
+		}, s.wrQueue, log)
 
 	s.stopChan = make(chan bool)
 	go s.pump()

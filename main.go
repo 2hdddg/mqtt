@@ -39,16 +39,21 @@ func (_ *publisher) Publish(s *server.Session, p *packet.Publish) error {
 	if tn == nil {
 		return errors.New("Illegal topic")
 	}
-	fmt.Println("About to publish", p.Topic, "from", scid)
 	for cid, sess := range sessions {
 		if cid == scid {
 			continue
 		}
 
-		fmt.Println("Sending publish to session", cid)
 		sess.EvalPublish(tn, p)
 	}
 	return nil
+}
+
+func (_ *publisher) Stopped(s *server.Session) {
+	delete(sessions, s.ClientId())
+	go func() {
+		s.Stop()
+	}()
 }
 
 type sessionLogger struct {
