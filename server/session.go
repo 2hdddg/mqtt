@@ -28,6 +28,7 @@ type Session struct {
 	wrQueue          *writequeue.Queue
 	maybePublishChan chan *maybePublish
 	publishReceived  *publish.Receiver
+	log              Logger
 }
 
 type Reader interface {
@@ -44,6 +45,12 @@ type Authorize interface {
 
 type Publisher interface {
 	Publish(s *Session, p *packet.Publish) error
+}
+
+type Logger interface {
+	Info(s string)
+	Error(s string)
+	Debug(s string)
 }
 
 func read(
@@ -72,8 +79,13 @@ func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
 	return nil
 }
 
-func (s *Session) write(p packet.Packet) {
-	i := &writequeue.Item{Packet: p}
+func (s *Session) write(p packet.Packet, m string) {
+	i := &writequeue.Item{
+		Packet: p,
+		Written: func() {
+			s.log.Info(m)
+		},
+	}
 	s.wrQueue.Add(i)
 }
 
@@ -102,7 +114,7 @@ func (s *Session) receivedSubscribe(sub *packet.Subscribe) {
 	s.write(&packet.SubscribeAck{
 		PacketId:    sub.PacketId,
 		ReturnCodes: retCodes,
-	})
+	}, "Sent SUBACK")
 }
 
 func (s *Session) receivedPublish(p *packet.Publish) {
@@ -118,14 +130,15 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 	// that topic, but MAY choose to discard it at any time - if this
 	// happens there will be no retained message for that topic.
 	if p.Retain {
-		fmt.Println("Retain NOT implemented")
+		s.log.Error("Retain for received PUBLISH not implemented")
 		return
 	}
 
 	// Delegate to state handler
 	err := s.publishReceived.Received(p)
 	if err != nil {
-		fmt.Println(err)
+		s.log.Error(fmt.Sprintf("Received PUBLISH error: %s", err))
+		return
 	}
 }
 
@@ -134,6 +147,10 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	if !matched {
 		return
 	}
+
+	s.log.Info(
+		fmt.Sprintf("PUBLISH of %d matched, publishing",
+			m.publish.PacketId))
 
 	// The publish packet now reflects the publish info received on
 	// another session, prepare the publish packet for being sent to
@@ -164,7 +181,7 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	p.QoS = maxQoS
 
 	// Publish
-	s.write(p)
+	s.write(p, "Sent PUBLISH")
 }
 
 func (s *Session) received(px packet.Packet) {
@@ -173,19 +190,23 @@ func (s *Session) received(px packet.Packet) {
 		// TODO: Close connection, CONNECT not allowed here.
 
 	case *packet.Subscribe:
+		s.log.Info("Received SUBSCRIBE")
 		s.receivedSubscribe(p)
 
 	case *packet.Publish:
+		s.log.Info("Received PUBLISH")
 		s.receivedPublish(p)
 
 	case *packet.PingReq:
-		s.write(&packet.PingResp{})
+		s.log.Info("Received PINGREQ")
+		s.write(&packet.PingResp{}, "Sent PINGRESP")
 
 	case *packet.Disconnect:
+		s.log.Info("Received DISCONNECT")
 		s.conn.Close()
 
 	default:
-		fmt.Printf("Received unhandled: %t\n", p)
+		s.log.Error(fmt.Sprintf("Received unhandled packet %t", p))
 	}
 }
 
@@ -206,7 +227,7 @@ func (s *Session) pump() {
 
 		// Read failure
 		case <-readErrChan:
-			fmt.Println("Receive error")
+			s.log.Error("Receive error")
 			return
 
 		// Server received a publish in another session, evaluate
@@ -221,9 +242,12 @@ func (s *Session) pump() {
 			return
 		}
 	}
+
+	s.log.Debug("Exiting pump")
 }
 
-func newSession(conn net.Conn, rd Reader, wr Writer,
+func newSession(
+	conn net.Conn, rd Reader, wr Writer,
 	connect *packet.Connect) *Session {
 
 	return &Session{
@@ -237,19 +261,21 @@ func newSession(conn net.Conn, rd Reader, wr Writer,
 	}
 }
 
-func (s *Session) Start(pub Publisher) error {
+func (s *Session) Start(pub Publisher, log Logger) error {
 	if s.stopChan != nil {
 		return errors.New("Already started")
 	}
 
+	s.log = log
+	s.log.Info("Started")
 	s.publishReceived = publish.NewReceiver(
 		func(p *packet.Publish) {
+			s.log.Info(fmt.Sprintf("Accepted publish of %d", p.PacketId))
 			pub.Publish(s, p)
 		}, s.wrQueue)
 
 	s.stopChan = make(chan bool)
 	go s.pump()
-	fmt.Println("Started session")
 
 	return nil
 }
@@ -260,7 +286,6 @@ func (s *Session) Stop() {
 	}
 
 	s.stopChan <- true
-	fmt.Println("Requested session stop")
 	<-s.stopChan
-	fmt.Println("Stopped session")
+	s.log.Info("Stopped")
 }

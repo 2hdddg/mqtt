@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -98,6 +99,21 @@ func (f *PubFake) Publish(s *Session, p *packet.Publish) error {
 	return nil
 }
 
+type tLogger struct {
+}
+
+func (l *tLogger) Info(s string) {
+	fmt.Println(s)
+}
+
+func (l *tLogger) Error(s string) {
+	fmt.Println(s)
+}
+
+func (l *tLogger) Debug(s string) {
+	fmt.Println(s)
+}
+
 func tSession(
 	t *testing.T) (*Session, *ReaderFake, *WriterFake, *PubFake) {
 
@@ -114,7 +130,7 @@ func tSession(
 	conn := &ConnFake{}
 	pub := NewPubFake()
 	sess := newSession(conn, rd, wr, connect)
-	sess.Start(pub)
+	sess.Start(pub, &tLogger{})
 	return sess, rd, wr, pub
 }
 

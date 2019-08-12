@@ -3,7 +3,7 @@ package packet
 import (
 	"bufio"
 	"bytes"
-	"fmt"
+
 
 	"io"
 )
@@ -82,7 +82,7 @@ func (r *Reader) ReadPacket(version uint8) (Packet, error) {
 	t := Type(ctrlAndFlags >> 4)
 	f := ctrlAndFlags & 0x0f
 
-	fmt.Printf("Received %s\n", t)
+	//fmt.Printf("Received %s\n", t)
 
 	// Read remaining length
 	rem, err := r.varInt()

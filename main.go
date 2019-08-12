@@ -51,6 +51,22 @@ func (_ *publisher) Publish(s *server.Session, p *packet.Publish) error {
 	return nil
 }
 
+type sessionLogger struct {
+	id string
+}
+
+func (l *sessionLogger) Info(s string) {
+	fmt.Printf("[%s] INF: %s\n", l.id, s)
+}
+
+func (l *sessionLogger) Error(s string) {
+	fmt.Printf("[%s] ERR: %s\n", l.id, s)
+}
+
+func (l *sessionLogger) Debug(s string) {
+	fmt.Printf("[%s] DBG: %s\n", l.id, s)
+}
+
 func makeSession(conn net.Conn) {
 	rd := &packet.Reader{bufio.NewReader(conn)}
 	wr := &packet.Writer{conn}
@@ -61,9 +77,10 @@ func makeSession(conn net.Conn) {
 	if err != nil {
 		return
 	}
-	sessions[sess.ClientId()] = sess
+	clientId := sess.ClientId()
+	sessions[clientId] = sess
 
-	sess.Start(pu)
+	sess.Start(pu, &sessionLogger{id: clientId})
 }
 
 func main() {
@@ -75,10 +92,10 @@ func main() {
 	defer l.Close()
 
 	for {
-		fmt.Println("Accepting connections")
+		//fmt.Println("Accepting connections")
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Failed to accept")
+			//fmt.Println("Failed to accept")
 			return
 		}
 		makeSession(conn)

@@ -1,8 +1,5 @@
 package packet
 
-import (
-	"fmt"
-)
 
 type Subscription struct {
 	Topic string
@@ -47,7 +44,6 @@ func (r *Reader) readSubscribe(fixflags uint8) (*Subscribe, error) {
 		s.QoS = QoS(qoS)
 
 		sub.Subscriptions = append(sub.Subscriptions, s)
-		fmt.Println(sub.Subscriptions)
 	}
 
 	// TODO: Check fixflags for correct value, must be 2
