@@ -18,7 +18,22 @@ func TestReceivePingRequest(t *testing.T) {
 
 func TestReceivePublishQoS0(t *testing.T) {
 	sess, r, _, p := tSession(t)
-	r.tWritePacket(&packet.Publish{})
+	r.tWritePacket(&packet.Publish{
+		QoS: packet.QoS0,
+	})
+	// Wait for publish callback or hang
+	<-p.publishChan
+	sess.Stop()
+}
+
+func TestReceivePublishQoS1(t *testing.T) {
+	sess, rd, wr, p := tSession(t)
+	rd.tWritePacket(&packet.Publish{
+		QoS: packet.QoS1,
+	})
+	// Wait for publish ack
+	x := <-wr.written
+	_ = x.(*packet.PublishAck)
 	// Wait for publish callback or hang
 	<-p.publishChan
 	sess.Stop()
