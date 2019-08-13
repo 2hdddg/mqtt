@@ -59,13 +59,8 @@ func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
 	return nil
 }
 
-func (s *Session) write(p packet.Packet, m string) {
-	i := &writequeue.Item{
-		Packet: p,
-		Written: func() {
-			s.log.Info(m)
-		},
-	}
+func (s *Session) write(p packet.Packet) {
+	i := &writequeue.Item{Packet: p}
 	s.wrQueue.Add(i)
 }
 
@@ -94,7 +89,7 @@ func (s *Session) receivedSubscribe(sub *packet.Subscribe) {
 	s.write(&packet.SubscribeAck{
 		PacketId:    sub.PacketId,
 		ReturnCodes: retCodes,
-	}, "Sent SUBACK")
+	})
 }
 
 func (s *Session) receivedPublish(p *packet.Publish) {
@@ -163,7 +158,7 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	p.QoS = maxQoS
 
 	// Publish
-	s.write(p, "Sent PUBLISH")
+	s.write(p)
 }
 
 func (s *Session) received(px packet.Packet) {
@@ -182,7 +177,7 @@ func (s *Session) received(px packet.Packet) {
 
 	case *packet.PingReq:
 		s.log.Info("Received PINGREQ")
-		s.write(&packet.PingResp{}, "Sent PINGRESP")
+		s.write(&packet.PingResp{})
 
 	case *packet.Disconnect:
 		s.log.Info("Received DISCONNECT")

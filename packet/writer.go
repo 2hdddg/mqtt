@@ -19,5 +19,6 @@ func (w *Writer) WritePacket(packet Packet, log logger.L) error {
 	if n != len(b) {
 		return newProtoErr("Wrote too few bytes")
 	}
+	log.Info("Sent " + packet.name())
 	return nil
 }

@@ -67,3 +67,7 @@ func (s *Subscribe) toPacket() []byte {
 
 	return h
 }
+
+func (c *Subscribe) name() string {
+	return "SUBSCRIBE"
+}

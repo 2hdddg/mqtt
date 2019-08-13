@@ -16,3 +16,7 @@ func (r *Reader) readDisconnect(fixflags uint8) (*Disconnect, error) {
 	// and disconnect the Client if they are not zero
 	return &Disconnect{Reserved: fixflags}, nil
 }
+
+func (c *Disconnect) name() string {
+	return "DISCONNECT"
+}

@@ -152,3 +152,7 @@ func (c *Connect) toPacket() []byte {
 
 	return h
 }
+
+func (c *Connect) name() string {
+	return "CONNECT"
+}

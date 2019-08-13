@@ -60,7 +60,6 @@ func (r *Receiver) Received(p *packet.Publish) error {
 			Packet: ack,
 			Written: func() {
 				r.written(p.PacketId)
-				r.log.Info("Sent PUBACK")
 			},
 		})
 	case packet.QoS2:

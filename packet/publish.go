@@ -82,3 +82,7 @@ func (p *Publish) toPacket() []byte {
 
 	return h
 }
+
+func (c *Publish) name() string {
+	return "PUBLISH"
+}

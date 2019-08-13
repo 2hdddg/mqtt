@@ -71,6 +71,7 @@ type Reader struct {
 
 type Packet interface {
 	toPacket() []byte
+	name() string
 }
 
 func (r *Reader) ReadPacket(version uint8, log logger.L) (Packet, error) {

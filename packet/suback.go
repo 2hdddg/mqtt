@@ -51,3 +51,7 @@ func (s *SubscribeAck) toPacket() []byte {
 
 	return h
 }
+
+func (c *SubscribeAck) name() string {
+	return "SUBACK"
+}

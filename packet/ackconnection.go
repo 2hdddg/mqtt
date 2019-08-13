@@ -40,3 +40,7 @@ func (a *AckConnection) toPacket() []byte {
 	}
 }
 
+func (a *AckConnection) name() string {
+	return "CONNACK"
+}
+

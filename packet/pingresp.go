@@ -14,3 +14,6 @@ func (p *PingResp) toPacket() []byte {
 	}
 }
 
+func (c *PingResp) name() string {
+	return "PINGRESP"
+}

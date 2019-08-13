@@ -24,3 +24,7 @@ func (p *PublishAck) toPacket() []byte {
 	h[3] = uint8(p.PacketId)
 	return h
 }
+
+func (c *PublishAck) name() string {
+	return "PUBACK"
+}

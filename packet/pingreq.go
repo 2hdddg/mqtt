@@ -14,3 +14,6 @@ func (p *PingReq) toPacket() []byte {
 	}
 }
 
+func (c *PingReq) name() string {
+	return "PINGREQ"
+}
