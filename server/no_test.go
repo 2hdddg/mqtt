@@ -99,6 +99,9 @@ func (f *PubFake) Publish(s *Session, p *packet.Publish) error {
 	return nil
 }
 
+func (f *PubFake) Stopped(s *Session) {
+}
+
 type tLogger struct {
 }
 
