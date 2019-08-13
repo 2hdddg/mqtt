@@ -35,7 +35,7 @@ func (a *authorize) CheckConnect(c *packet.Connect) packet.ConnRetCode {
 }
 
 func (_ *publisher) Publish(s *server.Session, p *packet.Publish) error {
-	scid := s.ClientId()
+	scid := s.ClientId
 	tn := topic.NewName(p.Topic)
 	if tn == nil {
 		return errors.New("Illegal topic")
@@ -51,9 +51,9 @@ func (_ *publisher) Publish(s *server.Session, p *packet.Publish) error {
 }
 
 func (_ *publisher) Stopped(s *server.Session) {
-	delete(sessions, s.ClientId())
+	delete(sessions, s.ClientId)
 	go func() {
-		s.Stop()
+		s.Dispose()
 	}()
 }
 
@@ -70,14 +70,13 @@ func makeSession(conn net.Conn) {
 	au := &authorize{}
 	pu := &publisher{}
 
-	sess, err := server.Connect(c, au, logger.NewServer())
+	pack, err := server.Connect(c, au, logger.NewServer())
 	if err != nil {
 		return
 	}
-	clientId := sess.ClientId()
+	clientId := pack.ClientIdentifier
+	sess := server.NewSession(c, pack, pu, logger.NewSession(clientId))
 	sessions[clientId] = sess
-
-	sess.Start(pu, logger.NewSession(clientId))
 }
 
 func main() {

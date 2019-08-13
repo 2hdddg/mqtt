@@ -94,8 +94,8 @@ func tSession(
 	}
 	conn := tNewConnFake(t)
 	pub := NewPubFake()
-	sess := newSession(conn, connect)
-	sess.Start(pub, logger.NewSession("S"))
+	log := logger.NewSession("123")
+	sess := NewSession(conn, connect, pub, log)
 	return sess, conn, pub
 }
 

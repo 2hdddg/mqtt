@@ -13,7 +13,7 @@ func TestReceivePingRequest(t *testing.T) {
 	// Wait for ping response or hang
 	x := <-conn.written
 	_ = x.(*packet.PingResp)
-	sess.Stop()
+	sess.Dispose()
 }
 
 func TestReceivePublishQoS0(t *testing.T) {
@@ -23,7 +23,7 @@ func TestReceivePublishQoS0(t *testing.T) {
 	})
 	// Wait for publish callback or hang
 	<-p.publishChan
-	sess.Stop()
+	sess.Dispose()
 }
 
 func TestReceivePublishQoS1(t *testing.T) {
@@ -36,7 +36,7 @@ func TestReceivePublishQoS1(t *testing.T) {
 	_ = x.(*packet.PublishAck)
 	// Wait for publish callback or hang
 	<-p.publishChan
-	sess.Stop()
+	sess.Dispose()
 }
 
 func TestReceiveSubscribe(t *testing.T) {
@@ -54,14 +54,14 @@ func TestReceiveSubscribe(t *testing.T) {
 	// Wait for subscribe ack
 	x := <-conn.written
 	_ = x.(*packet.SubscribeAck)
-	sess.Stop()
+	sess.Dispose()
 }
 
 func TestReceiveDisconnect(t *testing.T) {
 	sess, conn, _ := tSession(t)
 	conn.tWritePacket(&packet.Disconnect{})
 	// TODO: Assert what happens on disconnect!
-	sess.Stop()
+	sess.Dispose()
 }
 
 func TestEvalPublish(t *testing.T) {
@@ -85,5 +85,5 @@ func TestEvalPublish(t *testing.T) {
 	// Since topic matches subscription we should get the published.
 	x := <-conn.written
 	_ = x.(*packet.Publish)
-	sess.Stop()
+	sess.Dispose()
 }

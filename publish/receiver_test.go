@@ -64,8 +64,9 @@ func (a *tAccepter) accept(p *packet.Publish) {
 func TestReceivedPublishQoS0(t *testing.T) {
 	acc := tNewAccepter(t)
 	wr := &tWriter{}
-	wrQueue := writequeue.New(wr)
-	rec := NewReceiver(acc.accept, wrQueue, &tLogger{})
+	log := logger.NewServer()
+	wrQueue := writequeue.New(wr, log)
+	rec := NewReceiver(acc.accept, wrQueue, log)
 
 	p := &packet.Publish{
 		QoS: 0,
@@ -84,8 +85,9 @@ func TestReceivedPublishQoS0(t *testing.T) {
 func TestReceivedPublishQoS1(t *testing.T) {
 	acc := tNewAccepter(t)
 	wr := &tWriter{}
-	wrQueue := writequeue.New(wr)
-	rec := NewReceiver(acc.accept, wrQueue, &tLogger{})
+	log := logger.NewServer()
+	wrQueue := writequeue.New(wr, log)
+	rec := NewReceiver(acc.accept, wrQueue, log)
 
 	p := &packet.Publish{
 		QoS: 1,

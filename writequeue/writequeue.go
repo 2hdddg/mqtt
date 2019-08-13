@@ -24,19 +24,16 @@ type Item struct {
 	Written func()
 }
 
-func New(wr Writer) *Queue {
+func New(wr Writer, log logger.L) *Queue {
 	q := &Queue{
 		wr:       wr,
 		q:        list.New(),
 		addChan:  make(chan *Item),
 		stopChan: make(chan bool),
+		log:      log,
 	}
 	go q.monitor()
 	return q
-}
-
-func (q *Queue) SetLogger(log logger.L) {
-	q.log = log
 }
 
 func (q *Queue) Flush() {

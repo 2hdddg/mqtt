@@ -1,14 +1,11 @@
 package server
 
 import (
-	"errors"
 	"fmt"
-
 	"time"
 
 	"github.com/2hdddg/mqtt/conn"
 	"github.com/2hdddg/mqtt/logger"
-
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/publish"
 	"github.com/2hdddg/mqtt/topic"
@@ -30,11 +27,11 @@ const (
 )
 
 type Session struct {
+	ClientId         string
 	conn             conn.C
 	connState        connState
 	publisher        Publisher
 	connPacket       *packet.Connect
-	id               string
 	stopChan         chan bool
 	subs             *subscriptions
 	wrQueue          *writequeue.Queue
@@ -50,10 +47,6 @@ type Authorize interface {
 type Publisher interface {
 	Publish(s *Session, p *packet.Publish) error
 	Stopped(s *Session)
-}
-
-func (s *Session) ClientId() string {
-	return s.id
 }
 
 func (s *Session) EvalPublish(tn *topic.Name, p *packet.Publish) error {
@@ -204,6 +197,8 @@ func (s *Session) pump() {
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
 
+	s.log.Info("Started")
+
 	readAsync := func() {
 		keepAlive := time.Duration(s.connPacket.KeepAliveSecs)
 		keepAlive *= time.Second
@@ -247,23 +242,35 @@ func (s *Session) pump() {
 		case <-s.stopChan:
 			s.stopChan <- true
 			s.wrQueue.Flush()
+			s.log.Info("Stopped")
 			return
 		}
 	}
 }
 
-func newSession(
-	conn conn.C,
-	connect *packet.Connect) *Session {
+func NewSession(
+	conn conn.C, pack *packet.Connect,
+	pub Publisher, log logger.L) *Session {
 
-	return &Session{
+	s := &Session{
+		ClientId:         pack.ClientIdentifier,
 		conn:             conn,
-		connPacket:       connect,
-		id:               connect.ClientIdentifier,
+		connPacket:       pack,
 		subs:             newSubscriptions(),
-		wrQueue:          writequeue.New(conn),
+		wrQueue:          writequeue.New(conn, log),
 		maybePublishChan: make(chan *maybePublish),
+		log:              log,
+		publisher:        pub,
+		stopChan:         make(chan bool),
 	}
+	s.publishReceived = publish.NewReceiver(
+		func(p *packet.Publish) {
+			log.Info(fmt.Sprintf("Accepted publish of %d", p.PacketId))
+			pub.Publish(s, p)
+		}, s.wrQueue, s.log)
+
+	go s.pump()
+	return s
 }
 
 func (s *Session) enterConnState(x connState) {
@@ -273,33 +280,7 @@ func (s *Session) enterConnState(x connState) {
 	s.log.Info("Entered stopped state")
 }
 
-func (s *Session) Start(pub Publisher, log logger.L) error {
-	if s.stopChan != nil {
-		return errors.New("Already started")
-	}
-
-	s.wrQueue.SetLogger(log)
-	s.publisher = pub
-	s.log = log
-	s.log.Info("Started")
-	s.publishReceived = publish.NewReceiver(
-		func(p *packet.Publish) {
-			s.log.Info(fmt.Sprintf("Accepted publish of %d", p.PacketId))
-			pub.Publish(s, p)
-		}, s.wrQueue, log)
-
-	s.stopChan = make(chan bool)
-	go s.pump()
-
-	return nil
-}
-
-func (s *Session) Stop() {
-	if s.stopChan == nil {
-		return
-	}
-
+func (s *Session) Dispose() {
 	s.stopChan <- true
 	<-s.stopChan
-	s.log.Info("Stopped")
 }

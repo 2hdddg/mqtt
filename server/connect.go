@@ -10,7 +10,9 @@ import (
 	"github.com/2hdddg/mqtt/packet"
 )
 
-func Connect(conn conn.C, au Authorize, log logger.L) (*Session, error) {
+func Connect(
+	conn conn.C, au Authorize, log logger.L) (*packet.Connect, error) {
+
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -67,5 +69,5 @@ func Connect(conn conn.C, au Authorize, log logger.L) (*Session, error) {
 	}
 	log.Info(fmt.Sprintf("Client %s accepted", c.ClientIdentifier))
 
-	return newSession(conn, c), nil
+	return c, nil
 }
