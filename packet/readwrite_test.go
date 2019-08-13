@@ -11,7 +11,7 @@ import (
 
 func TestWriteReadPacket(t *testing.T) {
 	testcases := []struct {
-		x1 interface{}
+		x1 Packet
 	}{
 		{&Connect{
 			ProtocolName:     "MQTT",

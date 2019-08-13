@@ -69,7 +69,9 @@ type Reader struct {
 	*bufio.Reader
 }
 
-type Packet interface{}
+type Packet interface {
+	toPacket() []byte
+}
 
 func (r *Reader) ReadPacket(version uint8, log logger.L) (Packet, error) {
 	// Read fixed header

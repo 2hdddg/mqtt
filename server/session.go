@@ -194,7 +194,7 @@ func (s *Session) received(px packet.Packet) {
 }
 
 func (s *Session) pump() {
-	readPackChan := make(chan interface{})
+	readPackChan := make(chan packet.Packet)
 	readErrChan := make(chan error)
 
 	s.log.Info("Started")

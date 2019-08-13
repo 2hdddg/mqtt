@@ -1,7 +1,6 @@
 package packet
 
 import (
-	"errors"
 	"io"
 
 	"github.com/2hdddg/mqtt/logger"
@@ -11,17 +10,14 @@ type Writer struct {
 	io.Writer
 }
 
-type packetize interface {
-	toPacket() []byte
-}
-
 func (w *Writer) WritePacket(packet Packet, log logger.L) error {
-	p, ok := packet.(packetize)
-	if !ok {
-		log.Error("Trying to write unknown packet type")
-		return errors.New("Wrong type")
+	b := packet.toPacket()
+	n, err := w.Write(packet.toPacket())
+	if err != nil {
+		return err
 	}
-	b := p.toPacket()
-	_, err := w.Write(b)
-	return err
+	if n != len(b) {
+		return newProtoErr("Wrote too few bytes")
+	}
+	return nil
 }
