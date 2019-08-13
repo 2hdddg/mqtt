@@ -41,7 +41,7 @@ type Session struct {
 }
 
 type Connection interface {
-	ReadPacket(version uint8) (packet.Packet, error)
+	ReadPacket(version uint8, log packet.Logger) (packet.Packet, error)
 	WritePacket(packet packet.Packet) error
 	Close() error
 	SetReadDeadline(t time.Time) error
@@ -128,6 +128,7 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 	// happens there will be no retained message for that topic.
 	if p.Retain {
 		s.log.Error("Retain for received PUBLISH not implemented")
+		s.enterConnState(connStateError)
 		return
 	}
 
@@ -135,6 +136,7 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 	err := s.publishReceived.Received(p)
 	if err != nil {
 		s.log.Error(fmt.Sprintf("Received PUBLISH error: %s", err))
+		s.enterConnState(connStateError)
 		return
 	}
 }
@@ -220,7 +222,7 @@ func (s *Session) pump() {
 		}
 
 		go func() {
-			p, err := s.conn.ReadPacket(4)
+			p, err := s.conn.ReadPacket(4, s.log)
 			if err != nil {
 				readErrChan <- err
 			} else {

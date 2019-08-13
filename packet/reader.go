@@ -3,7 +3,7 @@ package packet
 import (
 	"bufio"
 	"bytes"
-
+	"fmt"
 
 	"io"
 )
@@ -64,14 +64,21 @@ func (t Type) String() string {
 	return "<unknown>"
 }
 
+type Logger interface {
+	Info(s string)
+	Error(s string)
+	Debug(s string)
+}
+
 type Reader struct {
 	*bufio.Reader
 }
 
 type Packet interface{}
 
-func (r *Reader) ReadPacket(version uint8) (Packet, error) {
+func (r *Reader) ReadPacket(version uint8, log Logger) (Packet, error) {
 	// Read fixed header
+	log.Debug("Waiting for data to read")
 	ctrlAndFlags, err := r.ReadByte()
 	if err != nil {
 		return nil,
@@ -81,8 +88,6 @@ func (r *Reader) ReadPacket(version uint8) (Packet, error) {
 	// Extract packet type and flags
 	t := Type(ctrlAndFlags >> 4)
 	f := ctrlAndFlags & 0x0f
-
-	//fmt.Printf("Received %s\n", t)
 
 	// Read remaining length
 	rem, err := r.varInt()
@@ -118,8 +123,8 @@ func (r *Reader) ReadPacket(version uint8) (Packet, error) {
 	case SUBACK:
 		p, err = r.readSubscribeAck(f)
 	default:
-		err = &Error{c: "control packet read",
-			m: "Unhandled packet", err: err}
+		log.Error(fmt.Sprintf("Read unhandled packet type %d", t))
+		err = &Error{c: "control packet read", m: "Unhandled packet"}
 	}
 	return p, err
 }

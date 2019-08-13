@@ -85,7 +85,7 @@ func makeSession(conn net.Conn) {
 	au := &authorize{}
 	pu := &publisher{}
 
-	sess, err := server.Connect(c, au)
+	sess, err := server.Connect(c, au, &sessionLogger{id: "CONN"})
 	if err != nil {
 		return
 	}

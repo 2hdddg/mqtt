@@ -2,18 +2,20 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/2hdddg/mqtt/packet"
 )
 
-func Connect(conn Connection, au Authorize) (*Session, error) {
+func Connect(conn Connection, au Authorize, log Logger) (*Session, error) {
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
 	// Wait for CONNECT
-	p, err := conn.ReadPacket(5)
+	log.Info("Waiting for CONNECT")
+	p, err := conn.ReadPacket(5, log)
 	if err != nil {
 		return nil, err
 	}
@@ -21,6 +23,7 @@ func Connect(conn Connection, au Authorize) (*Session, error) {
 	c, ok := p.(*packet.Connect)
 	if !ok {
 		conn.Close()
+		log.Error("Unexpected packet")
 		return nil, errors.New("Wrong package")
 	}
 
@@ -28,6 +31,7 @@ func Connect(conn Connection, au Authorize) (*Session, error) {
 	// sending a CONNACK
 	if c.ProtocolName != "MQTT" && c.ProtocolName != "MQIsdp" {
 		conn.Close()
+		log.Info("Wrong protocol")
 		return nil, errors.New("Invalid protocol")
 	}
 
@@ -36,6 +40,7 @@ func Connect(conn Connection, au Authorize) (*Session, error) {
 		conn.WritePacket(
 			packet.RefuseConnection(packet.ConnRefusedVersion))
 		conn.Close()
+		log.Info("Version not supported")
 		return nil, errors.New("Protocol version not supported")
 	}
 
@@ -44,6 +49,7 @@ func Connect(conn Connection, au Authorize) (*Session, error) {
 	if ret != packet.ConnAccepted {
 		conn.WritePacket(packet.RefuseConnection(ret))
 		conn.Close()
+		log.Info("Unauthorized")
 		return nil, errors.New("External auth refused")
 	}
 
@@ -57,9 +63,7 @@ func Connect(conn Connection, au Authorize) (*Session, error) {
 		conn.Close()
 		return nil, errors.New("Failed to send CONNACK")
 	}
-
-	// Reset deadline after CONNECT received
-	conn.SetReadDeadline(time.Time{})
+	log.Info(fmt.Sprintf("Client %s accepted", c.ClientIdentifier))
 
 	return newSession(conn, c), nil
 }
