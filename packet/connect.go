@@ -36,17 +36,16 @@ func (r *Reader) readConnect(fixflags uint8) (*Connect, error) {
 
 	c.ProtocolName, err = r.str()
 	if err != nil {
-		return nil, &Error{c: C, m: "ProtocolName", err: err}
+		return nil, err
 	}
-
 	c.ProtocolVersion, err = r.ReadByte()
 	if err != nil {
-		return nil, &Error{c: C, m: "ProtocolVersion", err: err}
+		return nil, err
 	}
 
 	conflags, err := r.ReadByte()
 	if err != nil {
-		return nil, &Error{c: C, m: "flags", err: err}
+		return nil, err
 	}
 	conflags = conflags >> 1
 	c.CleanStart = (conflags & 0x01) > 0
@@ -56,7 +55,7 @@ func (r *Reader) readConnect(fixflags uint8) (*Connect, error) {
 	if willFlag {
 		qoS := conflags & 0x03
 		if qoS > 3 {
-			return nil, &Error{c: C, m: "Illegal QoS", err: err}
+			return nil, newProtoErr("Illegal QoS value")
 		}
 		c.WillQoS = QoS(qoS)
 		conflags = conflags >> 2
@@ -73,7 +72,7 @@ func (r *Reader) readConnect(fixflags uint8) (*Connect, error) {
 
 	c.KeepAliveSecs, err = r.int2()
 	if err != nil {
-		return nil, &Error{c: C, m: "keep alive", err: err}
+		return nil, err
 	}
 
 	if c.ProtocolVersion > 4 {
@@ -84,7 +83,7 @@ func (r *Reader) readConnect(fixflags uint8) (*Connect, error) {
 	// Read Client identifier
 	c.ClientIdentifier, err = r.str()
 	if err != nil {
-		return nil, &Error{c: C, m: "ClientIdentifier", err: err}
+		return nil, err
 	}
 
 	if willFlag {
@@ -96,14 +95,14 @@ func (r *Reader) readConnect(fixflags uint8) (*Connect, error) {
 		// Will topic
 		willTopic, err := r.str()
 		if err != nil {
-			return nil, &Error{c: C, m: "Will topic", err: err}
+			return nil, err
 		}
 		c.WillTopic = &willTopic
 
 		// Will message
 		c.WillMessage, err = r.bin()
 		if err != nil {
-			return nil, &Error{c: C, m: "Will message", err: err}
+			return nil, err
 		}
 	}
 

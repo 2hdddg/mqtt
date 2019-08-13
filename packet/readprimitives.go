@@ -1,17 +1,17 @@
 package packet
 
 import (
-	"fmt"
 	"io"
 )
 
 func (r *Reader) int2() (uint16, error) {
-	msb, err1 := r.ReadByte()
-	lsb, err2 := r.ReadByte()
-
-	if err1 != nil || err2 != nil {
-		return 0, &Error{
-			c: "int 2", m: "buf too small"}
+	msb, err := r.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+	lsb, err := r.ReadByte()
+	if err != nil {
+		return 0, err
 	}
 
 	return (uint16(msb) << 8) | uint16(lsb), nil
@@ -28,12 +28,10 @@ func (r *Reader) varInt() (uint32, error) {
 	for {
 		enc, err := r.ReadByte()
 		if err != nil {
-			return 0, &Error{
-				c: "var int", m: "buf too small"}
+			return 0, err
 		}
 		if mul > (0x80 * 0x80 * 0x80) {
-			return 0, &Error{
-				c: "var int", m: "mul overflow"}
+			return 0, newProtoErr("Var int too big")
 		}
 
 		val += uint32((enc & 0x7f)) * mul
@@ -56,39 +54,36 @@ func (r *Reader) str() (string, error) {
 	chars := make([]byte, l)
 	n, err := r.Read(chars)
 	if err != nil {
-		return "", &Error{
-			c: "string", m: "read fail", err: err}
+		return "", err
 	}
 	if n != len(chars) {
-		m := fmt.Sprintf("too few bytes, %d != %d", n, len(chars))
-		return "", &Error{c: "string", m: m}
+		return "", newProtoErr("Too few chars in string")
 	}
 
 	return string(chars), nil
 }
 
 func (r *Reader) strMaybe() (*string, error) {
-	msb, err1 := r.ReadByte()
-	if err1 == io.EOF {
+	msb, err := r.ReadByte()
+	if err == io.EOF {
 		return nil, nil
 	}
-	lsb, err2 := r.ReadByte()
-	if err1 != nil || err2 != nil {
-		return nil, &Error{
-			c: "strMaybe", m: "buf too small"}
+	if err != nil {
+		return nil, err
 	}
-
+	lsb, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
 	l := (uint16(msb) << 8) | uint16(lsb)
 
 	chars := make([]byte, l)
 	n, err := r.Read(chars)
 	if err != nil {
-		return nil, &Error{
-			c: "string", m: "read fail", err: err}
+		return nil, err
 	}
 	if n != len(chars) {
-		m := fmt.Sprintf("too few bytes, %d != %d", n, len(chars))
-		return nil, &Error{c: "string", m: m}
+		return nil, newProtoErr("Too few chars in string")
 	}
 
 	s := string(chars)
@@ -104,12 +99,10 @@ func (r *Reader) bin() ([]byte, error) {
 	b := make([]byte, l)
 	n, err := r.Read(b)
 	if err != nil {
-		return []byte{}, &Error{
-			c: "binary", m: "read fail", err: err}
+		return []byte{}, err
 	}
 	if n != len(b) {
-		return []byte{}, &Error{
-			c: "binary", m: "too few bytes"}
+		return []byte{}, newProtoErr("Too few binary bytes")
 	}
 	return b, nil
 }

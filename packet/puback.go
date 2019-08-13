@@ -5,14 +5,13 @@ type PublishAck struct {
 }
 
 func (r *Reader) readPublishAck(fixflags uint8) (*PublishAck, error) {
-	const C = "read PUBACK"
 	var err error
 	p := &PublishAck{}
 
 	// From variable header
 	p.PacketId, err = r.int2()
 	if err != nil {
-		return nil, &Error{c: C, m: "Packet identifier", err: err}
+		return nil, err
 	}
 	return p, nil
 }

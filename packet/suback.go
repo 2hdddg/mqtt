@@ -8,14 +8,13 @@ type SubscribeAck struct {
 }
 
 func (r *Reader) readSubscribeAck(fixflags uint8) (*SubscribeAck, error) {
-	const C = "read SUBACK"
 	var err error
 	s := &SubscribeAck{}
 
 	// From variable header
 	s.PacketId, err = r.int2()
 	if err != nil {
-		return nil, &Error{c: C, m: "Packet identifier", err: err}
+		return nil, err
 	}
 
 	// Returns codes for N number of subscriptions
@@ -25,10 +24,10 @@ func (r *Reader) readSubscribeAck(fixflags uint8) (*SubscribeAck, error) {
 			break
 		}
 		if err != nil {
-			return nil, &Error{c: C, m: "Return code", err: err}
+			return nil, err
 		}
 		if qoS != byte(QoSFailure) && qoS > byte(QoSHighest) {
-			return nil, &Error{c: C, m: "Illegal QoS"}
+			return nil, newProtoErr("Illegal QoS")
 		}
 		s.ReturnCodes = append(s.ReturnCodes, QoS(qoS))
 	}

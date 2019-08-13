@@ -12,18 +12,17 @@ type Publish struct {
 }
 
 func (r *Reader) readPublish(fixflags uint8) (*Publish, error) {
-	const C = "read PUBLISH"
-	p := &Publish{}
-
 	// From fixed header
-	p.Duplicate = (fixflags & 0x08) > 0
-	p.Retain = (fixflags & 0x01) > 0
+	p := &Publish{
+		Duplicate: (fixflags & 0x08) > 0,
+		Retain:    (fixflags & 0x01) > 0,
+	}
 	qoS := (fixflags >> 1) & 0x03
 	if qoS == 4 {
 		// A PUBLISH Packet MUST NOT have both QoS bits set to 1.
 		// If a Server or Client receives a PUBLISH Packet which has
 		// both QoS bits set to 1 it MUST close the Network Connection
-		return nil, &Error{c: C, m: "QoS illegal"}
+		return nil, newProtoErr("QoS illegal")
 	}
 	p.QoS = QoS(qoS)
 
@@ -31,13 +30,13 @@ func (r *Reader) readPublish(fixflags uint8) (*Publish, error) {
 	var err error
 	p.Topic, err = r.str()
 	if err != nil {
-		return nil, &Error{c: C, m: "Topic name", err: err}
+		return nil, err
 	}
 
 	if qoS > 0 {
 		p.PacketId, err = r.int2()
 		if err != nil {
-			return nil, &Error{c: C, m: "Packet identifier", err: err}
+			return nil, err
 		}
 	}
 

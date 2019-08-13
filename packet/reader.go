@@ -81,8 +81,7 @@ func (r *Reader) ReadPacket(version uint8, log Logger) (Packet, error) {
 	log.Debug("Waiting for data to read")
 	ctrlAndFlags, err := r.ReadByte()
 	if err != nil {
-		return nil,
-			&Error{c: "fix header", m: "control packet type", err: err}
+		return nil, err
 	}
 
 	// Extract packet type and flags
@@ -99,32 +98,30 @@ func (r *Reader) ReadPacket(version uint8, log Logger) (Packet, error) {
 	buf := make([]byte, rem)
 	_, err = io.ReadFull(r, buf)
 	if err != nil {
-		return nil, &Error{c: "control packet read",
-			m: "failed to fill buffer", err: err}
+		return nil, err
 	}
 	r = &Reader{bufio.NewReader(bytes.NewBuffer(buf))}
 
-	var p Packet
 	switch t {
 	case CONNECT:
-		p, err = r.readConnect(f)
+		return r.readConnect(f)
 	case DISCONNECT:
-		p, err = r.readDisconnect(f)
+		return r.readDisconnect(f)
 	case PUBLISH:
-		p, err = r.readPublish(f)
+		return r.readPublish(f)
 	case PUBACK:
-		p, err = r.readPublishAck(f)
+		return r.readPublishAck(f)
 	case PINGREQ:
-		p, err = r.readPingReq(f)
+		return r.readPingReq(f)
 	case PINGRESP:
-		p, err = r.readPingResp(f)
+		return r.readPingResp(f)
 	case SUBSCRIBE:
-		p, err = r.readSubscribe(f)
+		return r.readSubscribe(f)
 	case SUBACK:
-		p, err = r.readSubscribeAck(f)
-	default:
-		log.Error(fmt.Sprintf("Read unhandled packet type %d", t))
-		err = &Error{c: "control packet read", m: "Unhandled packet"}
+		return r.readSubscribeAck(f)
 	}
-	return p, err
+
+	m := fmt.Sprintf("Unhandled packet type %d", t)
+	log.Error(m)
+	return nil, newProtoErr(m)
 }

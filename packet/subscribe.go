@@ -1,6 +1,5 @@
 package packet
 
-
 type Subscription struct {
 	Topic string
 	QoS   QoS
@@ -12,14 +11,13 @@ type Subscribe struct {
 }
 
 func (r *Reader) readSubscribe(fixflags uint8) (*Subscribe, error) {
-	const C = "read SUBSCRIBE"
 	sub := &Subscribe{}
 	var err error
 
 	// From variable header
 	sub.PacketId, err = r.int2()
 	if err != nil {
-		return nil, &Error{c: C, m: "Packet identifier", err: err}
+		return nil, err
 	}
 
 	// Payload, N number of subscriptions
@@ -27,7 +25,7 @@ func (r *Reader) readSubscribe(fixflags uint8) (*Subscribe, error) {
 		s := Subscription{}
 		topic, err := r.strMaybe()
 		if err != nil {
-			return nil, &Error{c: C, m: "Topic", err: err}
+			return nil, err
 		}
 		if topic == nil {
 			break
@@ -36,10 +34,10 @@ func (r *Reader) readSubscribe(fixflags uint8) (*Subscribe, error) {
 
 		qoS, err := r.ReadByte()
 		if err != nil {
-			return nil, &Error{c: C, m: "QoS", err: err}
+			return nil, err
 		}
 		if qoS > byte(QoSHighest) {
-			return nil, &Error{c: C, m: "Illegal QoS"}
+			return nil, newProtoErr("Illegal QoS")
 		}
 		s.QoS = QoS(qoS)
 
