@@ -62,17 +62,6 @@ type Logger interface {
 	Debug(s string)
 }
 
-func read(
-	rd Connection, packetChan chan interface{}, errorChan chan error) {
-
-	p, err := rd.ReadPacket(4)
-	if err != nil {
-		errorChan <- err
-	} else {
-		packetChan <- p
-	}
-}
-
 func (s *Session) ClientId() string {
 	return s.id
 }
@@ -223,23 +212,31 @@ func (s *Session) pump() {
 	readPackChan := make(chan interface{})
 	readErrChan := make(chan error)
 
-	readWDeadlineAsync := func() {
+	readAsync := func() {
 		keepAlive := time.Duration(s.connPacket.KeepAliveSecs)
 		keepAlive *= time.Second
 		if keepAlive > 0 {
 			s.conn.SetReadDeadline(time.Now().Add(keepAlive))
 		}
-		go read(s.conn, readPackChan, readErrChan)
+
+		go func() {
+			p, err := s.conn.ReadPacket(4)
+			if err != nil {
+				readErrChan <- err
+			} else {
+				readPackChan <- p
+			}
+		}()
 	}
 
-	readWDeadlineAsync()
+	readAsync()
 	for {
 		select {
 		// Received packet
 		case px := <-readPackChan:
 			s.received(px)
 			if s.connState == connStateUp {
-				readWDeadlineAsync()
+				readAsync()
 			}
 
 		// Read failure
