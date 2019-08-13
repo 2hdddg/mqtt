@@ -8,17 +8,17 @@ import (
 )
 
 func TestReceivePingRequest(t *testing.T) {
-	sess, r, w, _ := tSession(t)
-	r.tWritePacket(&packet.PingReq{})
+	sess, conn, _ := tSession(t)
+	conn.tWritePacket(&packet.PingReq{})
 	// Wait for ping response or hang
-	x := <-w.written
+	x := <-conn.written
 	_ = x.(*packet.PingResp)
 	sess.Stop()
 }
 
 func TestReceivePublishQoS0(t *testing.T) {
-	sess, r, _, p := tSession(t)
-	r.tWritePacket(&packet.Publish{
+	sess, conn, p := tSession(t)
+	conn.tWritePacket(&packet.Publish{
 		QoS: packet.QoS0,
 	})
 	// Wait for publish callback or hang
@@ -27,12 +27,12 @@ func TestReceivePublishQoS0(t *testing.T) {
 }
 
 func TestReceivePublishQoS1(t *testing.T) {
-	sess, rd, wr, p := tSession(t)
-	rd.tWritePacket(&packet.Publish{
+	sess, conn, p := tSession(t)
+	conn.tWritePacket(&packet.Publish{
 		QoS: packet.QoS1,
 	})
 	// Wait for publish ack
-	x := <-wr.written
+	x := <-conn.written
 	_ = x.(*packet.PublishAck)
 	// Wait for publish callback or hang
 	<-p.publishChan
@@ -40,7 +40,7 @@ func TestReceivePublishQoS1(t *testing.T) {
 }
 
 func TestReceiveSubscribe(t *testing.T) {
-	sess, rd, wr, _ := tSession(t)
+	sess, conn, _ := tSession(t)
 	sub := &packet.Subscribe{
 		PacketId: 0x0666,
 		Subscriptions: []packet.Subscription{
@@ -50,23 +50,23 @@ func TestReceiveSubscribe(t *testing.T) {
 			},
 		},
 	}
-	rd.tWritePacket(sub)
+	conn.tWritePacket(sub)
 	// Wait for subscribe ack
-	x := <-wr.written
+	x := <-conn.written
 	_ = x.(*packet.SubscribeAck)
 	sess.Stop()
 }
 
 func TestReceiveDisconnect(t *testing.T) {
-	sess, rd, _, _ := tSession(t)
-	rd.tWritePacket(&packet.Disconnect{})
+	sess, conn, _ := tSession(t)
+	conn.tWritePacket(&packet.Disconnect{})
 	// TODO: Assert what happens on disconnect!
 	sess.Stop()
 }
 
 func TestEvalPublish(t *testing.T) {
 	// Subscribe first, otherwise nothing will be received.
-	sess, rd, wr, _ := tSession(t)
+	sess, conn, _ := tSession(t)
 	sub := &packet.Subscribe{
 		PacketId: 0x0666,
 		Subscriptions: []packet.Subscription{
@@ -76,14 +76,14 @@ func TestEvalPublish(t *testing.T) {
 			},
 		},
 	}
-	rd.tWritePacket(sub)
-	<-wr.written // Wait for subscribe ack
+	conn.tWritePacket(sub)
+	<-conn.written // Wait for subscribe ack
 
 	topic := topic.NewName("a/b")
 	publish := &packet.Publish{}
 	sess.EvalPublish(topic, publish)
 	// Since topic matches subscription we should get the published.
-	x := <-wr.written
+	x := <-conn.written
 	_ = x.(*packet.Publish)
 	sess.Stop()
 }

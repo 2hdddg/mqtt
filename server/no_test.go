@@ -2,53 +2,47 @@ package server
 
 import (
 	"fmt"
-	"net"
+
 	"testing"
 	"time"
 
 	"github.com/2hdddg/mqtt/packet"
 )
 
-type ReaderFake struct {
-	pack chan packet.Packet
-	err  chan error
+type ConnFake struct {
+	rdpack  chan packet.Packet
+	rderr   chan error
+	wrerr   error
+	written chan packet.Packet
+	closed  bool
 }
 
-func tNewReaderFake(t *testing.T) *ReaderFake {
-	return &ReaderFake{
-		pack: make(chan packet.Packet, 1),
-		err:  make(chan error, 1),
+func tNewConnFake(t *testing.T) *ConnFake {
+	return &ConnFake{
+		rdpack:  make(chan packet.Packet, 1),
+		rderr:   make(chan error, 1),
+		written: make(chan packet.Packet, 3),
 	}
 }
 
-// Implements Reader interface
-func (r *ReaderFake) ReadPacket(version uint8) (packet.Packet, error) {
+func (r *ConnFake) ReadPacket(version uint8) (packet.Packet, error) {
 	for {
 		select {
-		case p := <-r.pack:
+		case p := <-r.rdpack:
 			return p, nil
-		case e := <-r.err:
+		case e := <-r.rderr:
 			return nil, e
 		}
 	}
 }
 
-func (r *ReaderFake) tWritePacket(p packet.Packet) {
-	r.pack <- p
+func (r *ConnFake) tWritePacket(p packet.Packet) {
+	r.rdpack <- p
 }
 
-type WriterFake struct {
-	err     error
-	written chan packet.Packet
-}
-
-func (w *WriterFake) WritePacket(p packet.Packet) error {
+func (w *ConnFake) WritePacket(p packet.Packet) error {
 	w.written <- p
-	return w.err
-}
-
-type ConnFake struct {
-	closed bool
+	return w.wrerr
 }
 
 func (c *ConnFake) Read(b []byte) (n int, err error) {
@@ -61,19 +55,7 @@ func (c *ConnFake) Close() error {
 	c.closed = true
 	return nil
 }
-func (c *ConnFake) LocalAddr() net.Addr {
-	return nil
-}
-func (c *ConnFake) RemoteAddr() net.Addr {
-	return nil
-}
-func (c *ConnFake) SetDeadline(t time.Time) error {
-	return nil
-}
 func (c *ConnFake) SetReadDeadline(t time.Time) error {
-	return nil
-}
-func (c *ConnFake) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
@@ -118,22 +100,18 @@ func (l *tLogger) Debug(s string) {
 }
 
 func tSession(
-	t *testing.T) (*Session, *ReaderFake, *WriterFake, *PubFake) {
+	t *testing.T) (*Session, *ConnFake, *PubFake) {
 
-	rd := tNewReaderFake(t)
 	connect := &packet.Connect{
 		ProtocolName:     "MQTT",
 		ProtocolVersion:  4,
 		KeepAliveSecs:    30,
 		ClientIdentifier: "xyz",
 	}
-	wr := &WriterFake{
-		written: make(chan packet.Packet, 3),
-	}
-	conn := &ConnFake{}
+	conn := tNewConnFake(t)
 	pub := NewPubFake()
-	sess := newSession(conn, rd, wr, connect)
+	sess := newSession(conn, connect)
 	sess.Start(pub, &tLogger{})
-	return sess, rd, wr, pub
+	return sess, conn, pub
 }
 

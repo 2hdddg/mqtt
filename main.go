@@ -72,13 +72,20 @@ func (l *sessionLogger) Debug(s string) {
 	fmt.Printf("[%s] DBG: %s\n", l.id, s)
 }
 
+type Conn struct {
+	net.Conn
+	*packet.Reader
+	*packet.Writer
+}
+
 func makeSession(conn net.Conn) {
 	rd := &packet.Reader{bufio.NewReader(conn)}
 	wr := &packet.Writer{conn}
+	c := &Conn{conn, rd, wr}
 	au := &authorize{}
 	pu := &publisher{}
 
-	sess, err := server.Connect(conn, rd, wr, au)
+	sess, err := server.Connect(c, au)
 	if err != nil {
 		return
 	}

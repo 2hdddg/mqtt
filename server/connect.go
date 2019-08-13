@@ -2,21 +2,18 @@ package server
 
 import (
 	"errors"
-	"net"
 	"time"
 
 	"github.com/2hdddg/mqtt/packet"
 )
 
-func Connect(
-	conn net.Conn, r Reader,
-	w Writer, a Authorize) (*Session, error) {
+func Connect(conn Connection, au Authorize) (*Session, error) {
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
 	// Wait for CONNECT
-	p, err := r.ReadPacket(5)
+	p, err := conn.ReadPacket(5)
 	if err != nil {
 		return nil, err
 	}
@@ -36,16 +33,16 @@ func Connect(
 
 	// If version check fails, notify client about wrong version
 	if c.ProtocolVersion < 4 || c.ProtocolVersion > 5 {
-		w.WritePacket(
+		conn.WritePacket(
 			packet.RefuseConnection(packet.ConnRefusedVersion))
 		conn.Close()
 		return nil, errors.New("Protocol version not supported")
 	}
 
 	// Authorization hook
-	ret := a.CheckConnect(c)
+	ret := au.CheckConnect(c)
 	if ret != packet.ConnAccepted {
-		w.WritePacket(packet.RefuseConnection(ret))
+		conn.WritePacket(packet.RefuseConnection(ret))
 		conn.Close()
 		return nil, errors.New("External auth refused")
 	}
@@ -55,7 +52,7 @@ func Connect(
 		SessionPresent: false, // TODO:
 		RetCode:        packet.ConnAccepted,
 	}
-	err = w.WritePacket(ack)
+	err = conn.WritePacket(ack)
 	if err != nil {
 		conn.Close()
 		return nil, errors.New("Failed to send CONNACK")
@@ -64,5 +61,5 @@ func Connect(
 	// Reset deadline after CONNECT received
 	conn.SetReadDeadline(time.Time{})
 
-	return newSession(conn, r, w, c), nil
+	return newSession(conn, c), nil
 }

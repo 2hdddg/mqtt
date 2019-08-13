@@ -3,7 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
-	"net"
+
 	"time"
 
 	"github.com/2hdddg/mqtt/packet"
@@ -27,9 +27,8 @@ const (
 )
 
 type Session struct {
-	conn             net.Conn
+	conn             Connection
 	connState        connState
-	rd               Reader
 	publisher        Publisher
 	connPacket       *packet.Connect
 	id               string
@@ -41,12 +40,11 @@ type Session struct {
 	log              Logger
 }
 
-type Reader interface {
+type Connection interface {
 	ReadPacket(version uint8) (packet.Packet, error)
-}
-
-type Writer interface {
 	WritePacket(packet packet.Packet) error
+	Close() error
+	SetReadDeadline(t time.Time) error
 }
 
 type Authorize interface {
@@ -65,7 +63,7 @@ type Logger interface {
 }
 
 func read(
-	rd Reader, packetChan chan interface{}, errorChan chan error) {
+	rd Connection, packetChan chan interface{}, errorChan chan error) {
 
 	p, err := rd.ReadPacket(4)
 	if err != nil {
@@ -231,7 +229,7 @@ func (s *Session) pump() {
 		if keepAlive > 0 {
 			s.conn.SetReadDeadline(time.Now().Add(keepAlive))
 		}
-		go read(s.rd, readPackChan, readErrChan)
+		go read(s.conn, readPackChan, readErrChan)
 	}
 
 	readWDeadlineAsync()
@@ -266,16 +264,15 @@ func (s *Session) pump() {
 }
 
 func newSession(
-	conn net.Conn, rd Reader, wr Writer,
+	conn Connection,
 	connect *packet.Connect) *Session {
 
 	return &Session{
 		conn:             conn,
-		rd:               rd,
 		connPacket:       connect,
 		id:               connect.ClientIdentifier,
 		subs:             newSubscriptions(),
-		wrQueue:          writequeue.New(wr),
+		wrQueue:          writequeue.New(conn),
 		maybePublishChan: make(chan *maybePublish),
 	}
 }
