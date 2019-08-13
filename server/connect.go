@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/2hdddg/mqtt/conn"
 	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 )
 
-func Connect(conn Connection, au Authorize, log logger.L) (*Session, error) {
+func Connect(conn conn.C, au Authorize, log logger.L) (*Session, error) {
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))

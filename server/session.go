@@ -6,7 +6,9 @@ import (
 
 	"time"
 
+	"github.com/2hdddg/mqtt/conn"
 	"github.com/2hdddg/mqtt/logger"
+
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/publish"
 	"github.com/2hdddg/mqtt/topic"
@@ -28,7 +30,7 @@ const (
 )
 
 type Session struct {
-	conn             Connection
+	conn             conn.C
 	connState        connState
 	publisher        Publisher
 	connPacket       *packet.Connect
@@ -39,13 +41,6 @@ type Session struct {
 	maybePublishChan chan *maybePublish
 	publishReceived  *publish.Receiver
 	log              logger.L
-}
-
-type Connection interface {
-	ReadPacket(version uint8, log logger.L) (packet.Packet, error)
-	WritePacket(packet packet.Packet, log logger.L) error
-	Close() error
-	SetReadDeadline(t time.Time) error
 }
 
 type Authorize interface {
@@ -258,7 +253,7 @@ func (s *Session) pump() {
 }
 
 func newSession(
-	conn Connection,
+	conn conn.C,
 	connect *packet.Connect) *Session {
 
 	return &Session{
