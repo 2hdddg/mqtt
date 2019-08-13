@@ -67,7 +67,7 @@ func TestConnect(t *testing.T) {
 		if c.readError != nil {
 			conn.rderr <- c.readError
 		}
-		sess, err := Connect(conn, au)
+		sess, err := Connect(conn, au, &tLogger{})
 		if c.shouldFail && (sess != nil || err == nil) {
 			t.Errorf("Should fail")
 		}

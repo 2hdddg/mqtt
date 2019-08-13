@@ -3,6 +3,7 @@ package packet
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -54,7 +55,7 @@ func TestWriteReadPacket(t *testing.T) {
 			t.Errorf("Failed to write packet: %s", err)
 		}
 		rd := Reader{bufio.NewReader(buf)}
-		x2, err := rd.ReadPacket(4)
+		x2, err := rd.ReadPacket(4, &tLogger{})
 		if err != nil {
 			t.Errorf("Failed to read packet: %s", err)
 		}
@@ -63,5 +64,20 @@ func TestWriteReadPacket(t *testing.T) {
 			t.Errorf("Structs differ!")
 		}
 	}
+}
+
+type tLogger struct {
+}
+
+func (l *tLogger) Info(s string) {
+	fmt.Println(s)
+}
+
+func (l *tLogger) Error(s string) {
+	fmt.Println(s)
+}
+
+func (l *tLogger) Debug(s string) {
+	fmt.Println(s)
 }
 

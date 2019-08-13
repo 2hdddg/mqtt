@@ -25,7 +25,7 @@ func tNewConnFake(t *testing.T) *ConnFake {
 	}
 }
 
-func (r *ConnFake) ReadPacket(version uint8) (packet.Packet, error) {
+func (r *ConnFake) ReadPacket(version uint8, log packet.Logger) (packet.Packet, error) {
 	for {
 		select {
 		case p := <-r.rdpack:
