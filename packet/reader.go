@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-
 	"io"
+
+	"github.com/2hdddg/mqtt/logger"
 )
 
 type Type uint8
@@ -64,19 +65,13 @@ func (t Type) String() string {
 	return "<unknown>"
 }
 
-type Logger interface {
-	Info(s string)
-	Error(s string)
-	Debug(s string)
-}
-
 type Reader struct {
 	*bufio.Reader
 }
 
 type Packet interface{}
 
-func (r *Reader) ReadPacket(version uint8, log Logger) (Packet, error) {
+func (r *Reader) ReadPacket(version uint8, log logger.L) (Packet, error) {
 	// Read fixed header
 	log.Debug("Waiting for data to read")
 	ctrlAndFlags, err := r.ReadByte()

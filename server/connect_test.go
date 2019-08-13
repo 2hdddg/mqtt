@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 )
 
@@ -67,7 +68,7 @@ func TestConnect(t *testing.T) {
 		if c.readError != nil {
 			conn.rderr <- c.readError
 		}
-		sess, err := Connect(conn, au, &tLogger{})
+		sess, err := Connect(conn, au, logger.NewServer())
 		if c.shouldFail && (sess != nil || err == nil) {
 			t.Errorf("Should fail")
 		}

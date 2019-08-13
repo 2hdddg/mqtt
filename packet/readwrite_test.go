@@ -3,9 +3,10 @@ package packet
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/2hdddg/mqtt/logger"
 )
 
 func TestWriteReadPacket(t *testing.T) {
@@ -47,15 +48,17 @@ func TestWriteReadPacket(t *testing.T) {
 		}},
 	}
 
+	l := logger.NewServer()
+
 	for _, c := range testcases {
 		buf := bytes.NewBuffer([]byte{})
 		wr := Writer{buf}
-		err := wr.WritePacket(c.x1)
+		err := wr.WritePacket(c.x1, l)
 		if err != nil {
 			t.Errorf("Failed to write packet: %s", err)
 		}
 		rd := Reader{bufio.NewReader(buf)}
-		x2, err := rd.ReadPacket(4, &tLogger{})
+		x2, err := rd.ReadPacket(4, l)
 		if err != nil {
 			t.Errorf("Failed to read packet: %s", err)
 		}
@@ -64,20 +67,5 @@ func TestWriteReadPacket(t *testing.T) {
 			t.Errorf("Structs differ!")
 		}
 	}
-}
-
-type tLogger struct {
-}
-
-func (l *tLogger) Info(s string) {
-	fmt.Println(s)
-}
-
-func (l *tLogger) Error(s string) {
-	fmt.Println(s)
-}
-
-func (l *tLogger) Debug(s string) {
-	fmt.Println(s)
 }
 

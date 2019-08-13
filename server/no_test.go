@@ -1,11 +1,10 @@
 package server
 
 import (
-	"fmt"
-
 	"testing"
 	"time"
 
+	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 )
 
@@ -25,7 +24,7 @@ func tNewConnFake(t *testing.T) *ConnFake {
 	}
 }
 
-func (r *ConnFake) ReadPacket(version uint8, log packet.Logger) (packet.Packet, error) {
+func (r *ConnFake) ReadPacket(version uint8, log logger.L) (packet.Packet, error) {
 	for {
 		select {
 		case p := <-r.rdpack:
@@ -40,7 +39,7 @@ func (r *ConnFake) tWritePacket(p packet.Packet) {
 	r.rdpack <- p
 }
 
-func (w *ConnFake) WritePacket(p packet.Packet) error {
+func (w *ConnFake) WritePacket(p packet.Packet, log logger.L) error {
 	w.written <- p
 	return w.wrerr
 }
@@ -84,21 +83,6 @@ func (f *PubFake) Publish(s *Session, p *packet.Publish) error {
 func (f *PubFake) Stopped(s *Session) {
 }
 
-type tLogger struct {
-}
-
-func (l *tLogger) Info(s string) {
-	fmt.Println(s)
-}
-
-func (l *tLogger) Error(s string) {
-	fmt.Println(s)
-}
-
-func (l *tLogger) Debug(s string) {
-	fmt.Println(s)
-}
-
 func tSession(
 	t *testing.T) (*Session, *ConnFake, *PubFake) {
 
@@ -111,7 +95,7 @@ func tSession(
 	conn := tNewConnFake(t)
 	pub := NewPubFake()
 	sess := newSession(conn, connect)
-	sess.Start(pub, &tLogger{})
+	sess.Start(pub, logger.NewSession("S"))
 	return sess, conn, pub
 }
 

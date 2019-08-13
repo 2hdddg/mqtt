@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/writequeue"
 )
@@ -29,7 +30,7 @@ type tWriter struct {
 	written []packet.Packet
 }
 
-func (w *tWriter) WritePacket(p packet.Packet) error {
+func (w *tWriter) WritePacket(p packet.Packet, l logger.L) error {
 	w.written = append(w.written, p)
 	return nil
 }

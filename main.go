@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/server"
 	"github.com/2hdddg/mqtt/topic"
@@ -56,22 +57,6 @@ func (_ *publisher) Stopped(s *server.Session) {
 	}()
 }
 
-type sessionLogger struct {
-	id string
-}
-
-func (l *sessionLogger) Info(s string) {
-	fmt.Printf("[%s] INF: %s\n", l.id, s)
-}
-
-func (l *sessionLogger) Error(s string) {
-	fmt.Printf("[%s] ERR: %s\n", l.id, s)
-}
-
-func (l *sessionLogger) Debug(s string) {
-	fmt.Printf("[%s] DBG: %s\n", l.id, s)
-}
-
 type Conn struct {
 	net.Conn
 	*packet.Reader
@@ -85,14 +70,14 @@ func makeSession(conn net.Conn) {
 	au := &authorize{}
 	pu := &publisher{}
 
-	sess, err := server.Connect(c, au, &sessionLogger{id: "CONN"})
+	sess, err := server.Connect(c, au, logger.NewServer())
 	if err != nil {
 		return
 	}
 	clientId := sess.ClientId()
 	sessions[clientId] = sess
 
-	sess.Start(pu, &sessionLogger{id: clientId})
+	sess.Start(pu, logger.NewSession(clientId))
 }
 
 func main() {

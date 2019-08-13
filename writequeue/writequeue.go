@@ -3,11 +3,12 @@ package writequeue
 import (
 	"container/list"
 
+	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 )
 
 type Writer interface {
-	WritePacket(packet packet.Packet) error
+	WritePacket(packet packet.Packet, log logger.L) error
 }
 
 type Queue struct {
@@ -15,6 +16,7 @@ type Queue struct {
 	q        *list.List
 	addChan  chan *Item
 	stopChan chan bool
+	log      logger.L
 }
 
 type Item struct {
@@ -31,6 +33,10 @@ func New(wr Writer) *Queue {
 	}
 	go q.monitor()
 	return q
+}
+
+func (q *Queue) SetLogger(log logger.L) {
+	q.log = log
 }
 
 func (q *Queue) Flush() {
@@ -59,7 +65,7 @@ func (q *Queue) monitor() {
 		q.q.Remove(e)
 		i := e.Value.(*Item)
 		go func() {
-			err := q.wr.WritePacket(i.Packet)
+			err := q.wr.WritePacket(i.Packet, q.log)
 			wrChan <- err
 			if i.Written != nil {
 				i.Written()

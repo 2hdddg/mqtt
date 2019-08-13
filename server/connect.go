@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 )
 
-func Connect(conn Connection, au Authorize, log Logger) (*Session, error) {
+func Connect(conn Connection, au Authorize, log logger.L) (*Session, error) {
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -38,7 +39,7 @@ func Connect(conn Connection, au Authorize, log Logger) (*Session, error) {
 	// If version check fails, notify client about wrong version
 	if c.ProtocolVersion < 4 || c.ProtocolVersion > 5 {
 		conn.WritePacket(
-			packet.RefuseConnection(packet.ConnRefusedVersion))
+			packet.RefuseConnection(packet.ConnRefusedVersion), log)
 		conn.Close()
 		log.Info("Version not supported")
 		return nil, errors.New("Protocol version not supported")
@@ -47,7 +48,7 @@ func Connect(conn Connection, au Authorize, log Logger) (*Session, error) {
 	// Authorization hook
 	ret := au.CheckConnect(c)
 	if ret != packet.ConnAccepted {
-		conn.WritePacket(packet.RefuseConnection(ret))
+		conn.WritePacket(packet.RefuseConnection(ret), log)
 		conn.Close()
 		log.Info("Unauthorized")
 		return nil, errors.New("External auth refused")
@@ -58,7 +59,7 @@ func Connect(conn Connection, au Authorize, log Logger) (*Session, error) {
 		SessionPresent: false, // TODO:
 		RetCode:        packet.ConnAccepted,
 	}
-	err = conn.WritePacket(ack)
+	err = conn.WritePacket(ack, log)
 	if err != nil {
 		conn.Close()
 		return nil, errors.New("Failed to send CONNACK")

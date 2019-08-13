@@ -6,6 +6,7 @@ import (
 
 	"time"
 
+	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/publish"
 	"github.com/2hdddg/mqtt/topic"
@@ -37,12 +38,12 @@ type Session struct {
 	wrQueue          *writequeue.Queue
 	maybePublishChan chan *maybePublish
 	publishReceived  *publish.Receiver
-	log              Logger
+	log              logger.L
 }
 
 type Connection interface {
-	ReadPacket(version uint8, log packet.Logger) (packet.Packet, error)
-	WritePacket(packet packet.Packet) error
+	ReadPacket(version uint8, log logger.L) (packet.Packet, error)
+	WritePacket(packet packet.Packet, log logger.L) error
 	Close() error
 	SetReadDeadline(t time.Time) error
 }
@@ -54,12 +55,6 @@ type Authorize interface {
 type Publisher interface {
 	Publish(s *Session, p *packet.Publish) error
 	Stopped(s *Session)
-}
-
-type Logger interface {
-	Info(s string)
-	Error(s string)
-	Debug(s string)
 }
 
 func (s *Session) ClientId() string {
@@ -283,11 +278,12 @@ func (s *Session) enterConnState(x connState) {
 	s.log.Info("Entered stopped state")
 }
 
-func (s *Session) Start(pub Publisher, log Logger) error {
+func (s *Session) Start(pub Publisher, log logger.L) error {
 	if s.stopChan != nil {
 		return errors.New("Already started")
 	}
 
+	s.wrQueue.SetLogger(log)
 	s.publisher = pub
 	s.log = log
 	s.log.Info("Started")
