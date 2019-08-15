@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"net"
 
+	"github.com/2hdddg/mqtt/conn"
 	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 	"github.com/2hdddg/mqtt/server"
@@ -57,16 +57,8 @@ func (_ *publisher) Stopped(s *server.Session) {
 	}()
 }
 
-type Conn struct {
-	net.Conn
-	*packet.Reader
-	*packet.Writer
-}
-
-func makeSession(conn net.Conn) {
-	rd := &packet.Reader{bufio.NewReader(conn)}
-	wr := &packet.Writer{conn}
-	c := &Conn{conn, rd, wr}
+func makeSession(netc net.Conn) {
+	c := conn.New(netc)
 	au := &authorize{}
 	pu := &publisher{}
 
