@@ -40,6 +40,26 @@ func (a *AckConnection) toPacket() []byte {
 	}
 }
 
+func (r *Reader) readConnectAck(fixflags uint8) (*AckConnection, error) {
+	var err error
+	c := &AckConnection{}
+	ackFlags, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	if ackFlags > 1 {
+		return nil, newProtoErr("Illegal ack flags")
+	}
+	c.SessionPresent = (ackFlags & 0x01) == 1
+
+	retCode, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	c.RetCode = ConnRetCode(retCode)
+	return c, nil
+}
+
 func (a *AckConnection) name() string {
 	return "CONNACK"
 }

@@ -19,6 +19,10 @@ func TestWriteReadPacket(t *testing.T) {
 			KeepAliveSecs:    30,
 			ClientIdentifier: "1",
 		}},
+		{&AckConnection{
+			SessionPresent: true,
+			RetCode:        ConnAccepted,
+		}},
 		{&Publish{
 			Duplicate: true,
 			QoS:       QoS1,
@@ -64,7 +68,7 @@ func TestWriteReadPacket(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(c.x1, x2) {
-			t.Errorf("Structs differ!")
+			t.Errorf("Structs differ for type %T", c.x1)
 		}
 	}
 }

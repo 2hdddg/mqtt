@@ -104,6 +104,8 @@ func (r *Reader) ReadPacket(version uint8, log logger.L) (Packet, error) {
 	switch t {
 	case CONNECT:
 		p, err = r.readConnect(f)
+	case CONNACK:
+		p, err = r.readConnectAck(f)
 	case DISCONNECT:
 		p, err = r.readDisconnect(f)
 	case PUBLISH:

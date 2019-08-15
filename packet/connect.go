@@ -29,8 +29,6 @@ type Connect struct {
 }
 
 func (r *Reader) readConnect(fixflags uint8) (*Connect, error) {
-	const C = "read CONNECT"
-
 	var err error
 	c := &Connect{}
 
