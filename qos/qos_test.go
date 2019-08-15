@@ -61,13 +61,18 @@ func (a *tAccepter) accept(p *packet.Publish) {
 	a.ch <- true
 }
 
-func TestReceivedPublishQoS0(t *testing.T) {
+func tNew(t *testing.T) (*QoS, *tAccepter, *tWriter, *writequeue.Queue) {
 	acc := tNewAccepter(t)
 	wr := &tWriter{}
 	log := logger.NewServer()
 	wrQueue := writequeue.New(wr, log)
 	qos := New(acc.accept, wrQueue, log)
 
+	return qos, acc, wr, wrQueue
+}
+
+func TestReceivedPublishQoS0(t *testing.T) {
+	qos, acc, wr, wrQueue := tNew(t)
 	p := &packet.Publish{
 		QoS: 0,
 	}
@@ -83,12 +88,7 @@ func TestReceivedPublishQoS0(t *testing.T) {
 }
 
 func TestReceivedPublishQoS1(t *testing.T) {
-	acc := tNewAccepter(t)
-	wr := &tWriter{}
-	log := logger.NewServer()
-	wrQueue := writequeue.New(wr, log)
-	qos := New(acc.accept, wrQueue, log)
-
+	qos, acc, wr, wrQueue := tNew(t)
 	p := &packet.Publish{
 		QoS: 1,
 	}
@@ -101,5 +101,72 @@ func TestReceivedPublishQoS1(t *testing.T) {
 	}
 	if len(wr.written) != 1 {
 		t.Errorf("Should have written once")
+	}
+	// Ensure that it is a PUBACK
+	_ = wr.written[0].(*packet.PublishAck)
+}
+
+func TestSendPublishQoS0(t *testing.T) {
+	qos, _, wr, _ := tNew(t)
+	pub := &packet.Publish{
+		QoS: packet.QoS0,
+	}
+	err := qos.SendPublish(pub)
+
+	if err != nil {
+		t.Errorf("Failed %s", err)
+	}
+	if len(wr.written) != 1 {
+		t.Errorf("Should have written once")
+	}
+	pubw := wr.written[0].(*packet.Publish)
+	if pubw.PacketId != 0 {
+		t.Errorf("Packet id should be zero for QoS 0")
+	}
+	if pubw.Duplicate {
+		t.Errorf("DUP should be false for QoS 0")
+	}
+}
+
+func TestSendPublishQoS1(t *testing.T) {
+	qos, _, wr, _ := tNew(t)
+	pub := &packet.Publish{
+		QoS: packet.QoS1,
+	}
+	err := qos.SendPublish(pub)
+
+	if err != nil {
+		t.Errorf("Failed %s", err)
+	}
+	if len(wr.written) != 1 {
+		t.Errorf("Should have written once")
+	}
+	pubw := wr.written[0].(*packet.Publish)
+	if pubw.PacketId == 0 {
+		t.Errorf("Packet id should be NON zero for QoS 0")
+	}
+	if pubw.Duplicate {
+		t.Errorf("DUP should be false for QoS 1")
+	}
+
+	// White-box check
+	_, exists := qos.sent[pubw.PacketId]
+	if !exists {
+		t.Errorf("Should keep PUBLISH packet until acked")
+	}
+
+	// Acknowledge PUBLISH
+	ack := &packet.PublishAck{
+		PacketId: pub.PacketId,
+	}
+	err = qos.ReceivedPublishAck(ack)
+	if err != nil {
+		t.Errorf("Failed %s", err)
+	}
+
+	// White-box check
+	_, exists = qos.sent[pubw.PacketId]
+	if exists {
+		t.Errorf("Should remove PUBLISH packet after acked")
 	}
 }
