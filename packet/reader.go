@@ -100,26 +100,34 @@ func (r *Reader) ReadPacket(version uint8, log logger.L) (Packet, error) {
 	}
 	r = &Reader{bufio.NewReader(bytes.NewBuffer(buf))}
 
+	var p Packet
 	switch t {
 	case CONNECT:
-		return r.readConnect(f)
+		p, err = r.readConnect(f)
 	case DISCONNECT:
-		return r.readDisconnect(f)
+		p, err = r.readDisconnect(f)
 	case PUBLISH:
-		return r.readPublish(f)
+		p, err = r.readPublish(f)
 	case PUBACK:
-		return r.readPublishAck(f)
+		p, err = r.readPublishAck(f)
 	case PINGREQ:
-		return r.readPingReq(f)
+		p, err = r.readPingReq(f)
 	case PINGRESP:
-		return r.readPingResp(f)
+		p, err = r.readPingResp(f)
 	case SUBSCRIBE:
-		return r.readSubscribe(f)
+		p, err = r.readSubscribe(f)
 	case SUBACK:
-		return r.readSubscribeAck(f)
+		p, err = r.readSubscribeAck(f)
 	}
-
-	m := fmt.Sprintf("Unhandled packet type %d", t)
-	log.Error(m)
-	return nil, newProtoErr(m)
+	if err != nil {
+		return nil, err
+	}
+	if p != nil {
+		log.Info(fmt.Sprintf("Received %s", p.name()))
+	} else {
+		m := fmt.Sprintf("Unhandled packet type %d", t)
+		log.Error(m)
+		return nil, newProtoErr(m)
+	}
+	return p, nil
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/2hdddg/mqtt/conn"
 	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
-	"github.com/2hdddg/mqtt/publish"
+	"github.com/2hdddg/mqtt/qos"
 	"github.com/2hdddg/mqtt/topic"
 	"github.com/2hdddg/mqtt/writequeue"
 )
@@ -36,7 +36,7 @@ type Session struct {
 	subs             *subscriptions
 	wrQueue          *writequeue.Queue
 	maybePublishChan chan *maybePublish
-	publishReceived  *publish.Receiver
+	qos              *qos.QoS
 	log              logger.L
 }
 
@@ -46,6 +46,7 @@ type Authorize interface {
 
 type Publisher interface {
 	Publish(s *Session, p *packet.Publish) error
+	//TakeOwnership()
 	Stopped(s *Session)
 }
 
@@ -111,9 +112,8 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 	}
 
 	// Delegate to state handler
-	err := s.publishReceived.Received(p)
+	err := s.qos.ReceivedPublish(p)
 	if err != nil {
-		s.log.Error(fmt.Sprintf("Received PUBLISH error: %s", err))
 		s.enterConnState(connStateError)
 		return
 	}
@@ -158,7 +158,11 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	p.QoS = maxQoS
 
 	// Publish
-	s.write(p)
+	err := s.qos.SendPublish(p)
+	if err != nil {
+		s.enterConnState(connStateError)
+		return
+	}
 }
 
 func (s *Session) received(px packet.Packet) {
@@ -168,20 +172,19 @@ func (s *Session) received(px packet.Packet) {
 		s.enterConnState(connStateError)
 
 	case *packet.Subscribe:
-		s.log.Info("Received SUBSCRIBE")
 		s.receivedSubscribe(p)
 
 	case *packet.Publish:
-		s.log.Info("Received PUBLISH")
 		s.receivedPublish(p)
 
 	case *packet.PingReq:
-		s.log.Info("Received PINGREQ")
 		s.write(&packet.PingResp{})
 
 	case *packet.Disconnect:
-		s.log.Info("Received DISCONNECT")
 		s.enterConnState(connStateDisconnected)
+
+	case *packet.PublishAck:
+		s.qos.ReceivedPublishAck(p)
 
 	default:
 		s.log.Error(fmt.Sprintf("Received unhandled packet %t", p))
@@ -258,7 +261,7 @@ func NewSession(
 		publisher:        pub,
 		stopChan:         make(chan bool),
 	}
-	s.publishReceived = publish.NewReceiver(
+	s.qos = qos.New(
 		func(p *packet.Publish) {
 			log.Info(fmt.Sprintf("Accepted publish of %d", p.PacketId))
 			pub.Publish(s, p)

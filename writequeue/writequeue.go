@@ -11,6 +11,8 @@ type Writer interface {
 	WritePacket(packet packet.Packet, log logger.L) error
 }
 
+// TODO: Handler for write errors!
+
 type Queue struct {
 	wr       Writer
 	q        *list.List
