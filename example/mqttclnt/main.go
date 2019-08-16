@@ -17,9 +17,21 @@ func main() {
 	}
 	defer nc.Close()
 	conn := conn.New(nc)
-	connected := client.Connect(conn, logger.NewServer())
-	if !connected {
-		fmt.Println("MQTT server did not allow")
+
+	opts := client.Options{
+		ClientId:        "a client",
+		ProtocolVersion: 4,
+		KeepAliveSecs:   3,
+	}
+
+	log := logger.NewServer()
+	err = client.Connect(conn, &opts, log)
+	if err != nil {
+		fmt.Println("MQTT server did not allow", err)
 		return
+	}
+
+	_ = client.NewSession(conn, log, opts.KeepAliveSecs)
+	for {
 	}
 }

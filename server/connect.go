@@ -13,23 +13,25 @@ import (
 func Connect(
 	conn conn.C, au Authorize, log logger.L) (*packet.Connect, error) {
 
+	// Wait for CONNECT
 	// If server does not receive CONNECT in a reasonable amount of time,
 	// the server should close the network connection.
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-	// Wait for CONNECT
 	log.Info("Waiting for CONNECT")
 	p, err := conn.ReadPacket(5, log)
 	if err != nil {
 		return nil, err
 	}
-
 	c, ok := p.(*packet.Connect)
 	if !ok {
 		conn.Close()
 		log.Error("Unexpected packet")
 		return nil, errors.New("Wrong package")
 	}
+	// The Server MUST validate that the CONNECT Packet conforms to
+	// section 3.1 and close the Network Connection without sending a
+	// CONNACK if it does not conform [MQTT-3.1.4-1].
+	// TODO
 
 	// If this fails, the server should close the connection without
 	// sending a CONNACK
