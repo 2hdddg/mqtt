@@ -20,6 +20,12 @@ type Session struct {
 }
 
 func (s *Session) received(px packet.Packet) {
+	switch p := px.(type) {
+	case *packet.PingResp:
+
+	default:
+		s.log.Error(fmt.Sprintf("Received unhandled packet %t", p))
+	}
 }
 
 func (s *Session) pump() {

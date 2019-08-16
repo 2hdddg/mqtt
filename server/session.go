@@ -197,9 +197,16 @@ func (s *Session) pump() {
 
 	s.log.Info("Started")
 
+	keepAlive := time.Duration(s.connPacket.KeepAliveSecs)
+	keepAlive += keepAlive / 2
+	keepAlive *= time.Second
+
 	readAsync := func() {
-		keepAlive := time.Duration(s.connPacket.KeepAliveSecs)
-		keepAlive *= time.Second
+		// If the Keep Alive value is non-zero and the Server does not
+		// receive a Control Packet from the Client within one and a half
+		// times the Keep Alive time period, it MUST disconnect the
+		// Network Connection to the Client as if the network had
+		// failed [MQTT-3.1.2-24].
 		if keepAlive > 0 {
 			s.conn.SetReadDeadline(time.Now().Add(keepAlive))
 		}
