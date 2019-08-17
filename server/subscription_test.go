@@ -1,6 +1,7 @@
 package server
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/2hdddg/mqtt/packet"
@@ -43,8 +44,7 @@ func TestMatch(t *testing.T) {
 	testcases := []struct {
 		subs    []packet.Subscription
 		topic   *topic.Name
-		qoS     packet.QoS
-		matched bool
+		matched *subscription
 	}{
 		// One match
 		{
@@ -55,8 +55,10 @@ func TestMatch(t *testing.T) {
 				},
 			},
 			topic.NewName("x/y"),
-			packet.QoS0,
-			true,
+			&subscription{
+				qoS:    packet.QoS0,
+				filter: *topic.NewFilter("x/y"),
+			},
 		},
 		// No match
 		{
@@ -67,8 +69,7 @@ func TestMatch(t *testing.T) {
 				},
 			},
 			topic.NewName("x/z"),
-			packet.QoSFailure,
-			false,
+			nil,
 		},
 		// Two matches, pick highest QoS
 		{
@@ -83,8 +84,10 @@ func TestMatch(t *testing.T) {
 				},
 			},
 			topic.NewName("x/y"),
-			packet.QoS2, // Should get highest!
-			true,
+			&subscription{
+				qoS:    packet.QoS2,
+				filter: *topic.NewFilter("x/#"),
+			},
 		},
 	}
 	for _, c := range testcases {
@@ -92,13 +95,9 @@ func TestMatch(t *testing.T) {
 		for _, sub := range c.subs {
 			s.subscribe(&sub)
 		}
-		matched, qoS := s.match(c.topic)
-		if matched != c.matched {
-			t.Errorf("Expected matched %v but was %v",
-				c.matched, matched)
-		}
-		if qoS != c.qoS {
-			t.Errorf("Expected QoS %v but got %v", c.qoS, qoS)
+		matched := s.match(c.topic)
+		if !reflect.DeepEqual(matched, c.matched) {
+			t.Errorf("Matching differs")
 		}
 	}
 }

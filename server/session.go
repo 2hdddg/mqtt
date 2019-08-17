@@ -120,8 +120,8 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 }
 
 func (s *Session) maybeSendPublish(m *maybePublish) {
-	matched, maxQoS := s.subs.match(&m.topic)
-	if !matched {
+	matched := s.subs.match(&m.topic)
+	if matched == nil {
 		return
 	}
 
@@ -155,7 +155,14 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	// QoS:
 	// the Server MUST deliver the message to the Client respecting the
 	// maximum QoS of all the matching subscriptions [MQTT-3.3.5-1].
-	p.QoS = maxQoS
+	p.QoS = matched.qoS
+
+	// The Topic Name in a PUBLISH Packet sent by a Server to a
+	// subscribing Client MUST match the Subscription’s Topic Filter
+	// according to the matching process defined in Section 4.7
+	// [MQTT-3.3.2-3]. However, since the Server is permitted to override
+	// the Topic Name, it might not be the same as the Topic Name in the
+	// original PUBLISH Packet.
 
 	// Publish
 	err := s.qos.SendPublish(p)
