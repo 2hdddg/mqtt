@@ -7,6 +7,7 @@ type wildsingle int
 
 type Filter struct {
 	parts []interface{}
+	orig  string
 }
 
 func NewFilter(s string) *Filter {
@@ -36,7 +37,10 @@ func NewFilter(s string) *Filter {
 		parts = append(parts, n)
 	}
 
-	return &Filter{parts: parts}
+	return &Filter{
+		parts: parts,
+		orig:  s,
+	}
 }
 
 func (f *Filter) Match(n *Name) bool {
@@ -66,5 +70,9 @@ func (f *Filter) Match(n *Name) bool {
 	}
 
 	return ni == len(n.parts)
+}
+
+func (f *Filter) String() string {
+	return f.orig
 }
 
