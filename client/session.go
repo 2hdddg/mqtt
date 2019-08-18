@@ -7,6 +7,7 @@ import (
 	"github.com/2hdddg/mqtt/conn"
 	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
+	"github.com/2hdddg/mqtt/qos"
 	"github.com/2hdddg/mqtt/topic"
 	"github.com/2hdddg/mqtt/writequeue"
 )
@@ -19,12 +20,17 @@ type Session struct {
 	log        logger.L
 	wrQueue    *writequeue.Queue
 	subscrChan chan *subscriptions
+	qos        *qos.QoS
 }
 
 func (s *Session) received(px packet.Packet) {
 	switch p := px.(type) {
 	case *packet.PingResp:
 	case *packet.SubscribeAck:
+		err := s.qos.ReceivedSubscribeAck(p)
+		if err != nil {
+			s.log.Error(fmt.Sprintf("Failed to ack subscribe %v", err))
+		}
 
 	default:
 		s.log.Error(fmt.Sprintf("Received unhandled packet %t", p))
@@ -75,13 +81,14 @@ func (s *Session) pump() {
 					QoS:   x.QoS,
 				})
 			}
-			p := &packet.Subscribe{
-				PacketId:      666,
-				Subscriptions: subs,
-			}
-			s.wrQueue.Add(&writequeue.Item{
-				Packet: p,
-			})
+			s.qos.SendSubscribe(
+				&packet.Subscribe{
+					Subscriptions: subs,
+				},
+				func(s *packet.Subscribe, a *packet.SubscribeAck) {
+					// TODO:
+					sub.ack([]Subscription{})
+				})
 
 		// Read failure
 		case err := <-readErrChan:
@@ -125,14 +132,16 @@ func (s *Session) Subscribe(subs []Subscription, ack SubscribeAck) {
 func NewSession(
 	conn conn.C, log logger.L, keepAliveSecs uint16) *Session {
 
+	wrQueue := writequeue.New(conn, log)
 	s := &Session{
 		ClientId:   "x",
 		conn:       conn,
 		keepAlive:  time.Duration(keepAliveSecs) * time.Second,
 		log:        log,
 		stopChan:   make(chan bool),
-		wrQueue:    writequeue.New(conn, log),
+		wrQueue:    wrQueue,
 		subscrChan: make(chan *subscriptions),
+		qos:        qos.New(wrQueue, log),
 	}
 
 	go s.pump()

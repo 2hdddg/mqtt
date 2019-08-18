@@ -10,10 +10,17 @@ import (
 )
 
 type Accept func(p *packet.Publish)
+type Subscribed func(s *packet.Subscribe, a *packet.SubscribeAck)
+
+type apacket struct {
+	publish    *packet.Publish
+	subscribe  *packet.Subscribe
+	subscribed Subscribed
+}
 
 type QoS struct {
 	received     map[uint16]*packet.Publish
-	sent         map[uint16]*packet.Publish
+	sent         map[uint16]apacket
 	lastPacketId uint16
 	wrQueue      *writequeue.Queue
 	mut          *sync.Mutex
@@ -21,11 +28,10 @@ type QoS struct {
 }
 
 func New(wrQueue *writequeue.Queue, log logger.L) *QoS {
-
 	return &QoS{
 		wrQueue:  wrQueue,
 		received: make(map[uint16]*packet.Publish),
-		sent:     make(map[uint16]*packet.Publish),
+		sent:     make(map[uint16]apacket),
 		mut:      &sync.Mutex{},
 		log:      log,
 	}
@@ -105,7 +111,7 @@ func (q *QoS) SendPublish(p *packet.Publish) error {
 		// new Application Message to publish,
 		q.mut.Lock()
 		p.PacketId = q.getUnusedPacketId()
-		q.sent[p.PacketId] = p
+		q.sent[p.PacketId] = apacket{publish: p}
 		q.mut.Unlock()
 
 		// MUST send a PUBLISH Packet containing this Packet Identifier
@@ -120,4 +126,28 @@ func (q *QoS) SendPublish(p *packet.Publish) error {
 		return errors.New("QoS above 1 is not implemented")
 	}
 	return nil
+}
+
+func (q *QoS) SendSubscribe(p *packet.Subscribe, cb Subscribed) error {
+	q.mut.Lock()
+	p.PacketId = q.getUnusedPacketId()
+	q.sent[p.PacketId] = apacket{subscribe: p, subscribed: cb}
+	q.mut.Unlock()
+	q.wrQueue.Add(&writequeue.Item{
+		Packet: p,
+	})
+	return nil
+}
+
+func (q *QoS) ReceivedSubscribeAck(p *packet.SubscribeAck) error {
+	q.mut.Lock()
+	defer q.mut.Unlock()
+	s, exists := q.sent[p.PacketId]
+	if exists && s.subscribe != nil {
+		go s.subscribed(s.subscribe, p)
+		delete(q.sent, p.PacketId)
+		return nil
+	} else {
+		return errors.New("Received SUBACK for unknown packetid")
+	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
 	t "github.com/2hdddg/mqtt/topic"
-
 )
 
 func connect() *client.Session {
@@ -80,6 +79,7 @@ func main() {
 				QoS:    packet.QoS(qos),
 			}},
 			func(acked []client.Subscription) {
+				fmt.Println("Subscribed")
 			})
 	}
 
