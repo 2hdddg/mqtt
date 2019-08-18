@@ -18,18 +18,9 @@ type maybePublish struct {
 	qoS     packet.QoS
 }
 
-type connState byte
-
-const (
-	connStateUp           connState = 0
-	connStateDisconnected connState = 1
-	connStateError        connState = 2
-)
-
 type Session struct {
 	ClientId         string
 	conn             conn.C
-	connState        connState
 	publisher        Publisher
 	connPacket       *packet.Connect
 	stopChan         chan bool
@@ -107,7 +98,7 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 	// happens there will be no retained message for that topic.
 	if p.Retain {
 		s.log.Error("Retain for received PUBLISH not implemented")
-		s.enterConnState(connStateError)
+		s.conn.Close()
 		return
 	}
 
@@ -118,7 +109,7 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 			s.publisher.Publish(s, p)
 		})
 	if err != nil {
-		s.enterConnState(connStateError)
+		s.conn.Close()
 		return
 	}
 }
@@ -171,7 +162,7 @@ func (s *Session) maybeSendPublish(m *maybePublish) {
 	// Publish
 	err := s.qos.SendPublish(p)
 	if err != nil {
-		s.enterConnState(connStateError)
+		s.conn.Close()
 		return
 	}
 }
@@ -180,7 +171,7 @@ func (s *Session) received(px packet.Packet) {
 	switch p := px.(type) {
 	case *packet.Connect:
 		// CONNECT not allowed here.
-		s.enterConnState(connStateError)
+		s.conn.Close()
 
 	case *packet.Subscribe:
 		s.receivedSubscribe(p)
@@ -192,7 +183,7 @@ func (s *Session) received(px packet.Packet) {
 		s.write(&packet.PingResp{})
 
 	case *packet.Disconnect:
-		s.enterConnState(connStateDisconnected)
+		s.conn.Close()
 
 	case *packet.PublishAck:
 		s.qos.ReceivedPublishAck(p)
@@ -238,19 +229,19 @@ func (s *Session) pump() {
 		// Received packet
 		case px := <-readPackChan:
 			s.received(px)
-			if s.connState == connStateUp {
+			if !s.conn.IsClosed() {
 				readAsync()
 			}
 
 		// Read failure
 		case err := <-readErrChan:
 			s.log.Error(fmt.Sprintf("Receive error %s", err))
-			s.enterConnState(connStateError)
+			s.conn.Close()
 
 		// Server received a publish in another session, evaluate
 		// the topic and see if it should be sent to this client.
 		case maybe := <-s.maybePublishChan:
-			if s.connState == connStateUp {
+			if !s.conn.IsClosed() {
 				s.maybeSendPublish(maybe)
 			}
 
@@ -282,15 +273,10 @@ func NewSession(
 		qos:              qos.New(wrQueue, log),
 	}
 
+	conn.SetLog(log)
+
 	go s.pump()
 	return s
-}
-
-func (s *Session) enterConnState(x connState) {
-	s.connState = x
-	s.conn.Close()
-	s.publisher.Stopped(s)
-	s.log.Info("Entered stopped state")
 }
 
 func (s *Session) Dispose() {

@@ -30,10 +30,12 @@ func (s *Session) received(px packet.Packet) {
 		err := s.qos.ReceivedSubscribeAck(p)
 		if err != nil {
 			s.log.Error(fmt.Sprintf("Failed to ack subscribe %v", err))
+			s.conn.Close()
 		}
 
 	default:
 		s.log.Error(fmt.Sprintf("Received unhandled packet %t", p))
+		s.conn.Close()
 	}
 }
 
@@ -68,9 +70,9 @@ func (s *Session) pump() {
 		// Received packet
 		case px := <-readPackChan:
 			s.received(px)
-			//if s.connState == connStateUp {
-			readAsync()
-			//}
+			if !s.conn.IsClosed() {
+				readAsync()
+			}
 
 		// Received subscribe request
 		case sub := <-s.subscrChan:
@@ -79,12 +81,12 @@ func (s *Session) pump() {
 		// Read failure
 		case err := <-readErrChan:
 			s.log.Error(fmt.Sprintf("Receive error %s", err))
-			//s.enterConnState(connStateError)
+			s.conn.Close()
 
 		// Stop requested
 		case <-s.stopChan:
 			s.stopChan <- true
-			//s.wrQueue.Flush()
+			s.wrQueue.Flush()
 			s.log.Info("Stopped")
 			return
 		}
@@ -153,6 +155,8 @@ func NewSession(
 		subscrChan: make(chan *subscriptions),
 		qos:        qos.New(wrQueue, log),
 	}
+
+	conn.SetLog(log)
 
 	go s.pump()
 	return s

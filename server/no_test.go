@@ -24,7 +24,9 @@ func tNewConnFake(t *testing.T) *ConnFake {
 	}
 }
 
-func (r *ConnFake) ReadPacket(version uint8, log logger.L) (packet.Packet, error) {
+func (r *ConnFake) ReadPacket(
+	version uint8, log logger.L) (packet.Packet, error) {
+
 	for {
 		select {
 		case p := <-r.rdpack:
@@ -47,15 +49,22 @@ func (w *ConnFake) WritePacket(p packet.Packet, log logger.L) error {
 func (c *ConnFake) Read(b []byte) (n int, err error) {
 	return 0, nil
 }
+
 func (c *ConnFake) Write(b []byte) (n int, err error) {
 	return 0, nil
 }
+
 func (c *ConnFake) Close() error {
 	c.closed = true
 	return nil
 }
+
 func (c *ConnFake) SetReadDeadline(t time.Time) error {
 	return nil
+}
+
+func (c *ConnFake) IsClosed() bool {
+	return c.closed
 }
 
 type AuthFake struct {

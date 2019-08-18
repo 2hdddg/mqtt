@@ -5,7 +5,6 @@ import (
 
 	"github.com/2hdddg/mqtt/logger"
 	"github.com/2hdddg/mqtt/packet"
-
 )
 
 type C interface {
@@ -13,5 +12,7 @@ type C interface {
 	WritePacket(packet packet.Packet, log logger.L) error
 	Close() error
 	SetReadDeadline(t time.Time) error
+	IsClosed() bool
+	SetLog(log logger.L)
 }
 
