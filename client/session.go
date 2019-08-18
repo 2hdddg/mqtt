@@ -26,10 +26,19 @@ type Session struct {
 func (s *Session) received(px packet.Packet) {
 	switch p := px.(type) {
 	case *packet.PingResp:
+		// TODO: Reset timer
 	case *packet.SubscribeAck:
 		err := s.qos.ReceivedSubscribeAck(p)
 		if err != nil {
-			s.log.Error(fmt.Sprintf("Failed to ack subscribe %v", err))
+			s.log.Error(fmt.Sprintf("Received SUBACK err: %v", err))
+			s.conn.Close()
+		}
+	case *packet.Publish:
+		err := s.qos.ReceivedPublish(p, func(pub *packet.Publish) {
+			s.log.Error("TODO: Received publish not forwarded")
+		})
+		if err != nil {
+			s.log.Error(fmt.Sprintf("Received PUBLISH err: %v", err))
 			s.conn.Close()
 		}
 
