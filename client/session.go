@@ -72,23 +72,9 @@ func (s *Session) pump() {
 			readAsync()
 			//}
 
-		// Received subscribe request, forward to server
+		// Received subscribe request
 		case sub := <-s.subscrChan:
-			subs := []packet.Subscription{}
-			for _, x := range sub.subs {
-				subs = append(subs, packet.Subscription{
-					Topic: x.Filter.String(),
-					QoS:   x.QoS,
-				})
-			}
-			s.qos.SendSubscribe(
-				&packet.Subscribe{
-					Subscriptions: subs,
-				},
-				func(s *packet.Subscribe, a *packet.SubscribeAck) {
-					// TODO:
-					sub.ack([]Subscription{})
-				})
+			s.subscribe(sub)
 
 		// Read failure
 		case err := <-readErrChan:
@@ -127,6 +113,30 @@ func (s *Session) Subscribe(subs []Subscription, ack SubscribeAck) {
 		subs: subs,
 		ack:  ack,
 	}
+}
+
+func (s *Session) subscribe(sub *subscriptions) {
+	// Repackage to packet format
+	subs := []packet.Subscription{}
+	for _, x := range sub.subs {
+		subs = append(subs, packet.Subscription{
+			Topic: x.Filter.String(),
+			QoS:   x.QoS,
+		})
+	}
+	s.qos.SendSubscribe(
+		&packet.Subscribe{
+			Subscriptions: subs,
+		},
+		// Called when SUBACK received
+		func(s *packet.Subscribe, a *packet.SubscribeAck) {
+			// Package to external callback format
+			// Order of return codes in SUBACK matches above
+			for i, _ := range sub.subs {
+				sub.subs[i].QoS = a.ReturnCodes[i]
+			}
+			sub.ack(sub.subs)
+		})
 }
 
 func NewSession(

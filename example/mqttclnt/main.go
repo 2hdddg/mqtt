@@ -79,7 +79,7 @@ func main() {
 				QoS:    packet.QoS(qos),
 			}},
 			func(acked []client.Subscription) {
-				fmt.Println("Subscribed")
+				fmt.Println("Subscribed", acked)
 			})
 	}
 
