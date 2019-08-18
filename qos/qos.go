@@ -51,6 +51,7 @@ func (q *QoS) writtenPUBACK(packetId uint16) {
 	q.mut.Unlock()
 }
 
+// PUBLISH can be received by both client and server.
 func (q *QoS) ReceivedPublish(p *packet.Publish, acc Accept) error {
 	switch p.QoS {
 	case packet.QoS0:
@@ -84,6 +85,7 @@ func (q *QoS) ReceivedPublish(p *packet.Publish, acc Accept) error {
 	return nil
 }
 
+// PUBACK can be received by both client and server.
 func (q *QoS) ReceivedPublishAck(p *packet.PublishAck) error {
 	// MUST treat the PUBLISH Packet as “unacknowledged” until it has
 	// received the corresponding PUBACK packet from the receiver.
@@ -98,6 +100,7 @@ func (q *QoS) ReceivedPublishAck(p *packet.PublishAck) error {
 	return nil
 }
 
+// PUBLISH can be sent by both client and server.
 func (q *QoS) SendPublish(p *packet.Publish) error {
 	switch p.QoS {
 	case packet.QoS0:
@@ -128,6 +131,7 @@ func (q *QoS) SendPublish(p *packet.Publish) error {
 	return nil
 }
 
+// SUBSCRIBE can only be sent by client.
 func (q *QoS) SendSubscribe(p *packet.Subscribe, cb Subscribed) error {
 	q.mut.Lock()
 	p.PacketId = q.getUnusedPacketId()
@@ -139,12 +143,15 @@ func (q *QoS) SendSubscribe(p *packet.Subscribe, cb Subscribed) error {
 	return nil
 }
 
+// SUBACK can only be received by client.
 func (q *QoS) ReceivedSubscribeAck(p *packet.SubscribeAck) error {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 	s, exists := q.sent[p.PacketId]
 	if exists && s.subscribe != nil {
-		go s.subscribed(s.subscribe, p)
+		if s.subscribed != nil {
+			go s.subscribed(s.subscribe, p)
+		}
 		delete(q.sent, p.PacketId)
 		return nil
 	} else {

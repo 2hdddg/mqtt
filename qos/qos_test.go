@@ -3,6 +3,7 @@ package qos
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -169,4 +170,39 @@ func TestSendPublishQoS1(t *testing.T) {
 	if exists {
 		t.Errorf("Should remove PUBLISH packet after acked")
 	}
+}
+
+func TestSendPublish(t *testing.T) {
+	qos, _, wr, _ := tNew(t)
+	sub := &packet.Subscribe{
+		Subscriptions: []packet.Subscription{
+			packet.Subscription{Topic: "x/y", QoS: packet.QoS1},
+			packet.Subscription{Topic: "x/#", QoS: packet.QoS2},
+		},
+	}
+	m := &sync.Mutex{}
+	m.Lock()
+	sl := sync.NewCond(m)
+	subscribed := func(s *packet.Subscribe, a *packet.SubscribeAck) {
+		sl.Signal()
+	}
+	// Send SUBSCRIBE
+	err := qos.SendSubscribe(sub, subscribed)
+	if err != nil {
+		t.Fatalf("Failed to send: %v", err)
+	}
+	if len(wr.written) != 1 {
+		t.Errorf("Should have written once, %d writes", len(wr.written))
+	}
+	subw := wr.written[0].(*packet.Subscribe)
+	if subw.PacketId == 0 {
+		t.Errorf("Packet id should be NON zero for QoS 0")
+	}
+
+	// Acknowledge SUBSCRIBE
+	ack := &packet.SubscribeAck{
+		PacketId: subw.PacketId,
+	}
+	qos.ReceivedSubscribeAck(ack)
+	sl.Wait() // Wait for callback
 }
