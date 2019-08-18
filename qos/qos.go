@@ -15,17 +15,14 @@ type QoS struct {
 	received     map[uint16]*packet.Publish
 	sent         map[uint16]*packet.Publish
 	lastPacketId uint16
-	accept       Accept
 	wrQueue      *writequeue.Queue
 	mut          *sync.Mutex
 	log          logger.L
 }
 
-func New(
-	accept Accept, wrQueue *writequeue.Queue, log logger.L) *QoS {
+func New(wrQueue *writequeue.Queue, log logger.L) *QoS {
 
 	return &QoS{
-		accept:   accept,
 		wrQueue:  wrQueue,
 		received: make(map[uint16]*packet.Publish),
 		sent:     make(map[uint16]*packet.Publish),
@@ -48,10 +45,10 @@ func (q *QoS) writtenPUBACK(packetId uint16) {
 	q.mut.Unlock()
 }
 
-func (q *QoS) ReceivedPublish(p *packet.Publish) error {
+func (q *QoS) ReceivedPublish(p *packet.Publish, acc Accept) error {
 	switch p.QoS {
 	case packet.QoS0:
-		q.accept(p)
+		acc(p)
 	case packet.QoS1:
 		// After it has sent a PUBACK Packet the Receiver MUST treat
 		// any incoming PUBLISH packet that contains the same Packet
@@ -59,7 +56,7 @@ func (q *QoS) ReceivedPublish(p *packet.Publish) error {
 		// setting of its DUP flag.
 		q.mut.Lock()
 		if _, exists := q.received[p.PacketId]; !exists {
-			go q.accept(p)
+			go acc(p)
 			q.received[p.PacketId] = p
 		}
 		q.mut.Unlock()

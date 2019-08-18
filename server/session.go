@@ -112,7 +112,11 @@ func (s *Session) receivedPublish(p *packet.Publish) {
 	}
 
 	// Delegate to state handler
-	err := s.qos.ReceivedPublish(p)
+	err := s.qos.ReceivedPublish(p,
+		func(_ *packet.Publish) {
+			s.log.Info(fmt.Sprintf("Accepted publish of %d", p.PacketId))
+			s.publisher.Publish(s, p)
+		})
 	if err != nil {
 		s.enterConnState(connStateError)
 		return
@@ -264,22 +268,19 @@ func NewSession(
 	conn conn.C, pack *packet.Connect,
 	pub Publisher, log logger.L) *Session {
 
+	wrQueue := writequeue.New(conn, log)
 	s := &Session{
 		ClientId:         pack.ClientIdentifier,
 		conn:             conn,
 		connPacket:       pack,
 		subs:             newSubscriptions(),
-		wrQueue:          writequeue.New(conn, log),
+		wrQueue:          wrQueue,
 		maybePublishChan: make(chan *maybePublish),
 		log:              log,
 		publisher:        pub,
 		stopChan:         make(chan bool),
+		qos:              qos.New(wrQueue, log),
 	}
-	s.qos = qos.New(
-		func(p *packet.Publish) {
-			log.Info(fmt.Sprintf("Accepted publish of %d", p.PacketId))
-			pub.Publish(s, p)
-		}, s.wrQueue, s.log)
 
 	go s.pump()
 	return s

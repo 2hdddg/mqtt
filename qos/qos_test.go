@@ -66,7 +66,7 @@ func tNew(t *testing.T) (*QoS, *tAccepter, *tWriter, *writequeue.Queue) {
 	wr := &tWriter{}
 	log := logger.NewServer()
 	wrQueue := writequeue.New(wr, log)
-	qos := New(acc.accept, wrQueue, log)
+	qos := New( /*acc.accept,*/ wrQueue, log)
 
 	return qos, acc, wr, wrQueue
 }
@@ -76,7 +76,7 @@ func TestReceivedPublishQoS0(t *testing.T) {
 	p := &packet.Publish{
 		QoS: 0,
 	}
-	qos.ReceivedPublish(p)
+	qos.ReceivedPublish(p, acc.accept)
 	wrQueue.Flush()
 
 	if err := acc.tWaitForAccept(); err != nil {
@@ -92,7 +92,7 @@ func TestReceivedPublishQoS1(t *testing.T) {
 	p := &packet.Publish{
 		QoS: 1,
 	}
-	qos.ReceivedPublish(p)
+	qos.ReceivedPublish(p, acc.accept)
 	wrQueue.Flush()
 
 	// Ok to accept before or after PUBACK written
