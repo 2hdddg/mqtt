@@ -59,6 +59,9 @@ func (c *ConnFake) Close() error {
 	return nil
 }
 
+func (c *ConnFake) SetLog(log logger.L) {
+}
+
 func (c *ConnFake) SetReadDeadline(t time.Time) error {
 	return nil
 }
